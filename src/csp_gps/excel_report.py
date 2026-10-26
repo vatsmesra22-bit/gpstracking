@@ -17,6 +17,7 @@ from . import NOT_AVAILABLE
 from .extract import CATEGORIES, OTHER
 from .labels import problem_name, status_name
 from .pipeline import ALL_COLUMNS, TRACKER_COLUMNS
+from .visits import done_visits, score_zero_visits
 
 NAVY = "1F3864"
 BLUE = "2F5597"
@@ -692,25 +693,27 @@ def _write_evidence(ws, evidence: pd.DataFrame, summary: dict) -> None:
 def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
     ws["A1"] = "App Visits – visits recorded in the SBI CSP Visit App"
     ws["A1"].font = TITLE_FONT
-    for i, w in enumerate([13, 13, 16, 14, 16, 20, 11, 13, 13, 36], start=1):
+    for i, w in enumerate([13, 13, 16, 14, 16, 20, 11, 11, 13, 13, 36], start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
     if visits is None or visits.empty:
         ws["A3"] = "No visit report loaded. Put the app's visit report (.xlsx) in input/visit_reports/ or in Downloads."
         ws["A3"].font = SUB_FONT
         return
-    u = visits[visits["Duplicate Row"] == "No"]
+    u, zero = done_visits(visits), score_zero_visits(visits)
+    if u.empty:
+        u = visits[visits["Duplicate Row"] == "No"]
     files = sorted({Path(f).name for f in visits["Source File"]})
     ws["A2"] = (f"Period {min(u['Visit Date']):%d %b %Y} – {max(u['Visit Date']):%d %b %Y} · latest visit "
-                f"{max(u['Visit Date']):%A %d %b %Y} · {len(u)} visits from {len(files)} report file(s): "
-                f"{', '.join(files)} (repeats counted once)")
+                f"{max(u['Visit Date']):%A %d %b %Y} · {len(u)} done visits from {len(files)} report file(s): "
+                f"{', '.join(files)} (repeats counted once; {len(zero)} score-0 visit(s) not counted, listed below)")
     ws["A2"].font = SUB_FONT
     row = 4
-    _header(ws, row, ["App visits", "CSPs visited", "DC users", "Avg score", "Score below 80",
-                      "Compliance done", "Closures done"])
+    _header(ws, row, ["Done visits", "CSPs visited", "DC users", "Avg score", "Score below 80",
+                      "Compliance done", "Closures done", "Score 0 (not done)"])
     row += 1
     vals = [len(u), u["CSP Code"].nunique(), u["DC User"].nunique(), round(float(u["Visit Score"].mean()), 1),
             int((u["Visit Score"] < 80).sum()), int((u["Compliance Completed"] == "YES").sum()),
-            int((u["Closures Completed"] == "YES").sum())]
+            int((u["Closures Completed"] == "YES").sum()), len(zero)]
     for j, v in enumerate(vals, start=1):
         c = ws.cell(row=row, column=j, value=v)
         c.font, c.border, c.alignment = Font(bold=True, size=14, color=NAVY), BORDER, Alignment(horizontal="center")
@@ -744,6 +747,19 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
         ws.cell(row=row, column=1).number_format = "dd-mmm-yyyy"
     row += 2
 
+    if len(zero):
+        _section(ws, row, f"Score 0 visits – recorded in the app but not completed ({len(zero)}, not counted above)")
+        row += 1
+        _header(ws, row, ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score"])
+        for _, r in zero.sort_values("Visit Date").iterrows():
+            row += 1
+            for j, col in enumerate(["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name",
+                                     "Visit Score"], start=1):
+                c = ws.cell(row=row, column=j, value=_cell_value(r[col]))
+                c.border, c.fill = BORDER, PatternFill("solid", fgColor="F8CBAD")
+            ws.cell(row=row, column=2).number_format = "dd-mmm-yyyy"
+        row += 2
+
     _section(ws, row, "Complaint CSPs – was the visit later recorded in the app?")
     row += 1
     _header(ws, row, ["Record ID", "Complaint date", "CSP ID", "Problem", "Status", "App visit on", "App score"])
@@ -765,7 +781,7 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
     row += 3
     _section(ws, row, "All app visits")
     row += 1
-    cols = ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
+    cols = ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score", "Visit Done",
             "Compliance Completed", "Closures Completed", "Duplicate Row"]
     _header(ws, row, cols)
     hdr = row

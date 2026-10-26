@@ -5,7 +5,11 @@ CSP Code, BC code, Circle Name, Link Branch Code, Visit Date, Visit Score,
 Compliance Completed, Closures Completed, username
 
 Rows are never dropped. Exact repeats are kept and marked `Duplicate Row = Yes` so totals can count
-each visit once (one CSP, one date, one app user).
+each visit once (one CSP, one date, one app user). When repeats differ, the row with the best score is the one
+counted.
+
+`Visit Done = No` marks a visit whose score is 0: the app recorded it, but it was not completed, so it is not
+counted as a done visit and never closes a complaint. A missing score is treated as done.
 """
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ COLUMN_ALIASES = {
     "closures completed": "Closures Completed", "username": "DC User",
 }
 VISIT_COLUMNS = ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
-                 "Compliance Completed", "Closures Completed", "BC Code", "Duplicate Row", "Source File"]
+                 "Visit Done", "Compliance Completed", "Closures Completed", "BC Code", "Duplicate Row", "Source File"]
 
 
 def _load_users(path: Path | None) -> dict[str, str]:
@@ -76,9 +80,27 @@ def load_visit_reports(folder: Path, project_dir: Path, users_csv: Path | None =
     v["Visit Score"] = pd.to_numeric(v["Visit Score"], errors="coerce")
     for col in ("Compliance Completed", "Closures Completed"):
         v[col] = v[col].fillna(NOT_AVAILABLE).astype(str).str.strip().str.upper()
+    v["Visit Done"] = (v["Visit Score"].isna() | (v["Visit Score"] > 0)).map({True: "Yes", False: "No"})
+    # best score first, so that of repeated rows the completed one is the one counted
+    v = v.sort_values("Visit Score", ascending=False, na_position="last", kind="stable")
     v["Duplicate Row"] = v.duplicated(["CSP Code", "Visit Date", "DC User"], keep="first").map({True: "Yes", False: "No"})
     v = v[VISIT_COLUMNS].sort_values(["Visit Date", "CSP Code"]).reset_index(drop=True)
     return v, failed
+
+
+def done_visits(visits: pd.DataFrame) -> pd.DataFrame:
+    """Each visit once, only the completed ones (score above 0)."""
+    if visits.empty:
+        return visits
+    done = visits["Visit Done"] != "No" if "Visit Done" in visits.columns else True
+    return visits[(visits["Duplicate Row"] == "No") & done]
+
+
+def score_zero_visits(visits: pd.DataFrame) -> pd.DataFrame:
+    """Each visit once, only those recorded with score 0 (not completed)."""
+    if visits.empty or "Visit Done" not in visits.columns:
+        return visits.iloc[0:0]
+    return visits[(visits["Duplicate Row"] == "No") & (visits["Visit Done"] == "No")]
 
 
 def link_visits(issues: pd.DataFrame, visits: pd.DataFrame) -> pd.DataFrame:
@@ -88,7 +110,7 @@ def link_visits(issues: pd.DataFrame, visits: pd.DataFrame) -> pd.DataFrame:
     out["App Visit Score"] = None
     if visits.empty or out.empty:
         return out
-    uniq = visits[visits["Duplicate Row"] == "No"]
+    uniq = done_visits(visits)
     by_csp = {k: g.sort_values("Visit Date") for k, g in uniq.groupby("CSP Code")}
     for i, r in out.iterrows():
         g = by_csp.get(str(r["CSP ID"]).upper())

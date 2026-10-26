@@ -62,3 +62,14 @@
 | Resolution Tracker | Status × category, and unresolved cases with Next Step and Suggested Action |
 | Data Quality and Verification | Completeness checks, input files, records to verify |
 | Evidence Index | Every image, its hash, OCR status and link status |
+
+## visits.csv – SBI CSP Visit App report
+
+| Column | Meaning |
+|---|---|
+| CSP Code, Visit Date, Circle, Branch Code, DC User, DC Name | As in the app's visit report (`username` → DC User) |
+| Visit Score | 0–100 score from the app |
+| Visit Done | `Yes` if the score is above 0 (or missing). `No` for score 0: the visit was recorded but not completed, so it is not counted and never closes a complaint |
+| Compliance Completed, Closures Completed | YES / NO from the app |
+| Duplicate Row | `Yes` = the same visit (CSP + date + app user) repeated in a report. The best-score row is counted once |
+| Source File | Which report file the row came from |

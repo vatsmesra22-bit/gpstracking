@@ -253,3 +253,24 @@ def test_scheduler_next_run():
     assert next_run(datetime(2026, 10, 21, 16, 30, tzinfo=ist), times) == datetime(2026, 10, 22, 10, 0, tzinfo=ist)
     with pytest.raises(ValueError):
         parse_times("25:00")
+
+
+# --- SBI visit report: score 0 = not completed --------------------------------------------------------
+def test_score_zero_visits_not_counted(tmp_path):
+    from csp_gps.visits import done_visits, load_visit_reports, score_zero_visits
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({
+        "CSP Code": ["1A000001", "1A000001", "1A000002", "1A000003", "1A000003"],
+        "Visit Date": ["2026-10-08"] * 5,
+        "Visit Score": [0, 90, 0, 85, 85],
+        "username": ["BC1", "BC1", "BC2", "BC3", "BC3"],
+    }).to_excel(folder / "Visit report test.xlsx", index=False)
+    v, failed = load_visit_reports(folder, tmp_path)
+    assert not failed
+    assert (v["Duplicate Row"] == "No").sum() == 3            # each visit once
+    done, zero = done_visits(v), score_zero_visits(v)
+    assert sorted(done["CSP Code"]) == ["1A000001", "1A000003"]  # the 90 row is kept, not the 0 repeat
+    assert done.loc[done["CSP Code"] == "1A000001", "Visit Score"].item() == 90
+    assert list(zero["CSP Code"]) == ["1A000002"]

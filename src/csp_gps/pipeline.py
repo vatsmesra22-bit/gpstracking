@@ -31,7 +31,7 @@ from .extract import (
 from .media import Evidence, OcrEngine, phash_distance, process_attachment
 from .parser import Message, discover_and_parse
 from .state import StateStore
-from .visits import load_visit_reports
+from .visits import done_visits, load_visit_reports, score_zero_visits
 
 log = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ def run(settings: Settings) -> dict:
     visits, visit_failures = load_visit_reports(settings.visit_reports_dir, settings.project_dir,
                                                 settings.project_dir / "config" / "dc_users.csv")
     app_visits: dict[str, list] = {}
-    for _, v in visits[visits["Duplicate Row"] == "No"].iterrows():
+    for _, v in done_visits(visits).iterrows():  # a score-0 visit was not completed, so it never closes a complaint
         app_visits.setdefault(v["CSP Code"], []).append((v["Visit Date"], v["Visit Score"]))
 
     parsed = discover_and_parse(settings.input_dir, settings.project_dir, work_dir)
@@ -400,6 +400,8 @@ def run(settings: Settings) -> dict:
         "visit_reports": sorted(set(visits["Source File"])) if len(visits) else [],
         "visit_rows": int(len(visits)),
         "visits_unique": int((visits["Duplicate Row"] == "No").sum()) if len(visits) else 0,
+        "visits_done": int(len(done_visits(visits))) if len(visits) else 0,
+        "visits_score_zero": int(len(score_zero_visits(visits))) if len(visits) else 0,
         "visit_period": [str(min(visits["Visit Date"])), str(max(visits["Visit Date"]))] if len(visits) else None,
         "visit_report_failures": visit_failures,
     }

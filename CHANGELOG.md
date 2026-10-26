@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.7.0 – 2026-10-26 – score 0 visits
+
+### Changed
+- A visit with **score 0** was recorded in the app but not completed. It is no longer counted as a done visit, and
+  it never auto-closes a complaint. Example: the 1–25 Oct report has 201 visits; 2 have score 0, so 199 are done.
+- When the same visit is repeated with different scores, the best-score row is the one counted.
+
+### Added
+- `visits.csv` has a new `Visit Done` column (Yes / No). `run_summary.json` has new `visits_done` and
+  `visits_score_zero` keys.
+- Dashboard App Visits tab: the card now reads "Visits done", and a new "Score 0 (not done)" card opens the list.
+- Excel App Visits sheet: a "Score 0 (not done)" count, a list of the score-0 visits, and a `Visit Done` column.
+
 ## 1.6.0 – 2026-10-21 – Docker + nginx
 
 ### Added

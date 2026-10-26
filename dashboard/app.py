@@ -330,6 +330,8 @@ def load(data_dir: str, mtime: float):
         if len(visits):
             visits["Visit Date"] = pd.to_datetime(visits["Visit Date"], errors="coerce").dt.date
             visits["Visit Score"] = pd.to_numeric(visits["Visit Score"], errors="coerce")
+            if "Visit Done" not in visits.columns:  # data written before v1.7
+                visits["Visit Done"] = (visits["Visit Score"].isna() | (visits["Visit Score"] > 0)).map({True: "Yes", False: "No"})
     summary = json.loads((d / "run_summary.json").read_text(encoding="utf-8"))
     brief_file = d / "agent_brief.json"
     brief = json.loads(brief_file.read_text(encoding="utf-8")) if brief_file.exists() else {}
@@ -395,7 +397,7 @@ def csp_view(d: pd.DataFrame) -> pd.DataFrame:
 
 
 def visit_view(d: pd.DataFrame) -> pd.DataFrame:
-    return d[["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
+    return d[["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score", "Visit Done",
               "Compliance Completed", "Closures Completed"]]
 
 
@@ -738,18 +740,21 @@ with tab_visits:
         st.info("Abhi koi visit report nahi hai. SBI CSP Visit App ki report (\"Visit report ... .xlsx\") Downloads mein "
                 "daal ke 'Update Report.bat' chalaiye.")
     else:
-        u = visits[visits["Duplicate Row"] == "No"]
+        once = visits[visits["Duplicate Row"] == "No"]
+        u, zero = once[once["Visit Done"] != "No"], once[once["Visit Done"] == "No"]  # score 0 = not completed
         vmin, vmax = min(u["Visit Date"]), max(u["Visit Date"])
         files = sorted({Path(x).name for x in visits["Source File"]})
         st.markdown(
             f"<div class='today quiet'><div class='today-h'>📅 SBI CSP Visit App report: {vmin:%d %b} – {vmax:%d %b %Y}</div>"
             f"<div class='small-note'>Latest visit date in the report: <b>{vmax:%A, %d %b %Y}</b> · "
-            f"{len(files)} report file(s): {html.escape(', '.join(files))} · each visit counted once</div></div>",
+            f"{len(files)} report file(s): {html.escape(', '.join(files))} · each visit counted once · "
+            f"score 0 wali visits poori nahi hui, isliye alag dikhayi hain</div></div>",
             unsafe_allow_html=True)
         vdates = st.date_input("Visit date", (vmin, vmax), min_value=vmin, max_value=vmax, key="visit_dates",
                                help="Show only visits made between these dates")
         if isinstance(vdates, (list, tuple)) and len(vdates) == 2:
             u = u[(u["Visit Date"] >= vdates[0]) & (u["Visit Date"] <= vdates[1])]
+            zero = zero[(zero["Visit Date"] >= vdates[0]) & (zero["Visit Date"] <= vdates[1])]
         if u.empty:
             st.info("In tarikhon mein koi app visit nahi hai.")
             st.stop()
@@ -758,14 +763,16 @@ with tab_visits:
         low = u[u["Visit Score"] < 80]
         comp = u[u["Compliance Completed"] == "YES"]
         card_row([
-            (card("App visits", len(u), period, "", "📲"), "kpi_v_all", f"📲 App visits – {len(u)}", u, "visits"),
+            (card("Visits done", len(u), period, "", "📲"), "kpi_v_all", f"📲 Visits done – {len(u)}", u, "visits"),
+            (card("Score 0 (not done)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
+             "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (counted nahi)", zero, "visits"),
             (card("CSPs visited", u["CSP Code"].nunique(), "in the app", "green", "🏪"),
              "kpi_v_csp", f"🏪 CSPs visited – {u['CSP Code'].nunique()}", u.drop_duplicates("CSP Code"), "visits"),
             (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
              "kpi_v_dc", f"👥 DCs – {u['DC User'].nunique()}", u, "dc"),
             (card("Avg visit score", f"{u['Visit Score'].mean():.0f}", "out of 100", "orange", "⭐"),
              "kpi_v_score", "⭐ All visits by score (lowest first)", u.sort_values("Visit Score"), "visits"),
-            (card("Low score (<80)", len(low), "need a look", "red", "⚠️"),
+            (card("Low score (<80)", len(low), "need a look", "orange", "⚠️"),
              "kpi_v_low", f"⚠️ Low-score visits – {len(low)}", low.sort_values("Visit Score"), "visits"),
             (card("Compliance done", len(comp), f"of {len(u)} visits", "purple", "📑"),
              "kpi_v_comp", f"📑 Compliance done – {len(comp)}", comp, "visits"),
@@ -832,7 +839,7 @@ with tab_visits:
             vt = visits if not vq else visits[visits.astype(str).apply(
                 lambda c: c.str.contains(vq, case=False, regex=False)).any(axis=1)]
             vview = vt[["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
-                        "Compliance Completed", "Closures Completed", "Duplicate Row"]]
+                        "Visit Done", "Compliance Completed", "Closures Completed", "Duplicate Row"]]
             st.dataframe(vview, hide_index=True, width="stretch", height=420,
                          column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
                                         "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
