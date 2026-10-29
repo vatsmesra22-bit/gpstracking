@@ -103,6 +103,24 @@ def score_zero_visits(visits: pd.DataFrame) -> pd.DataFrame:
     return visits[(visits["Duplicate Row"] == "No") & (visits["Visit Done"] == "No")]
 
 
+def done_csps(visits: pd.DataFrame) -> pd.DataFrame:
+    """One row per CSP that has a completed visit (its latest one). This is the headline "visits done" count:
+    a CSP visited on two days is counted once, as the manager counts it."""
+    d = done_visits(visits)
+    if d.empty:
+        return d
+    return d.sort_values("Visit Date").drop_duplicates("CSP Code", keep="last")
+
+
+def score_zero_csps(visits: pd.DataFrame) -> pd.DataFrame:
+    """One row per CSP whose visits all have score 0, i.e. no completed visit yet."""
+    z = score_zero_visits(visits)
+    if z.empty:
+        return z
+    z = z[~z["CSP Code"].isin(set(done_visits(visits)["CSP Code"]))]
+    return z.sort_values("Visit Date").drop_duplicates("CSP Code", keep="last")
+
+
 def link_visits(issues: pd.DataFrame, visits: pd.DataFrame) -> pd.DataFrame:
     """For each complaint, the first app visit recorded for the same CSP on or after the complaint date."""
     out = issues.copy()

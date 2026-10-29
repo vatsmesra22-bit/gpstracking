@@ -1,6 +1,6 @@
 [project]
 name = "csp-gps-issue-report"
-version = "1.9.0"
+version = "1.10.0"
 description = "Turns CSP visit-failure complaints from WhatsApp into an Excel report and a dashboard (Eko India Financial Services, internal)."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"

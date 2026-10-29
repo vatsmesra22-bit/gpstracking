@@ -314,3 +314,19 @@ def test_upload_box_saves_checks_and_skips_repeats(tmp_path):
     other = io.BytesIO()
     pd.DataFrame({"Name": ["x"]}).to_excel(other, index=False)
     assert not save_upload("random.xlsx", other.getvalue(), tmp_path).ok
+
+
+def test_each_csp_counted_once_in_visit_totals(tmp_path):
+    from csp_gps.visits import done_csps, load_visit_reports, score_zero_csps
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({
+        "CSP Code": ["1A000001", "1A000001", "1A000002", "1A000003", "1A000003"],
+        "Visit Date": ["2026-10-08", "2026-10-20", "2026-10-09", "2026-10-10", "2026-10-21"],
+        "Visit Score": [88, 90, 0, 0, 85],
+        "username": ["BC1", "BC1", "BC2", "BC3", "BC3"],
+    }).to_excel(folder / "Visit report.xlsx", index=False)
+    v, _ = load_visit_reports(folder, tmp_path)
+    assert sorted(done_csps(v)["CSP Code"]) == ["1A000001", "1A000003"]   # visited twice -> counted once
+    assert list(score_zero_csps(v)["CSP Code"]) == ["1A000002"]            # 1A000003 later completed

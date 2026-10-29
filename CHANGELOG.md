@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0 – 2026-10-29 – each CSP counted once
+
+### Changed
+- App visit totals count **each CSP once**, as the manager counts them. A CSP visited on two days is one visit done.
+  Score 0 now lists only CSPs that have no completed visit at all. The dashboard, Excel and `run_summary.json`
+  (`visits_done`, `visits_score_zero`) all use the same rule.
+- App Visits tab: removed the "Compliance done" and "CSPs visited" cards (the second was the same number as
+  "Visits done").
+
 ## 1.9.0 – 2026-10-29 – upload box
 
 ### Added

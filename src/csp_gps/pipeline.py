@@ -31,7 +31,7 @@ from .extract import (
 from .media import Evidence, OcrEngine, phash_distance, process_attachment
 from .parser import Message, discover_and_parse
 from .state import StateStore
-from .visits import done_visits, load_visit_reports, score_zero_visits
+from .visits import done_csps, done_visits, load_visit_reports, score_zero_csps
 
 log = logging.getLogger(__name__)
 
@@ -400,8 +400,8 @@ def run(settings: Settings) -> dict:
         "visit_reports": sorted(set(visits["Source File"])) if len(visits) else [],
         "visit_rows": int(len(visits)),
         "visits_unique": int((visits["Duplicate Row"] == "No").sum()) if len(visits) else 0,
-        "visits_done": int(len(done_visits(visits))) if len(visits) else 0,
-        "visits_score_zero": int(len(score_zero_visits(visits))) if len(visits) else 0,
+        "visits_done": int(len(done_csps(visits))) if len(visits) else 0,            # each CSP once
+        "visits_score_zero": int(len(score_zero_csps(visits))) if len(visits) else 0,
         "visit_period": [str(min(visits["Visit Date"])), str(max(visits["Visit Date"]))] if len(visits) else None,
         "visit_report_failures": visit_failures,
     }

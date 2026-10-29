@@ -17,7 +17,7 @@ from . import NOT_AVAILABLE
 from .extract import CATEGORIES, OTHER
 from .labels import problem_name, status_name
 from .pipeline import ALL_COLUMNS, TRACKER_COLUMNS
-from .visits import done_visits, score_zero_visits
+from .visits import done_csps, score_zero_csps
 
 NAVY = "1F3864"
 BLUE = "2F5597"
@@ -699,21 +699,19 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
         ws["A3"] = "No visit report loaded. Put the app's visit report (.xlsx) in input/visit_reports/ or in Downloads."
         ws["A3"].font = SUB_FONT
         return
-    u, zero = done_visits(visits), score_zero_visits(visits)
+    u, zero = done_csps(visits), score_zero_csps(visits)   # each CSP once
     if u.empty:
         u = visits[visits["Duplicate Row"] == "No"]
     files = sorted({Path(f).name for f in visits["Source File"]})
     ws["A2"] = (f"Period {min(u['Visit Date']):%d %b %Y} – {max(u['Visit Date']):%d %b %Y} · latest visit "
                 f"{max(u['Visit Date']):%A %d %b %Y} · {len(u)} done visits from {len(files)} report file(s): "
-                f"{', '.join(files)} (repeats counted once; {len(zero)} score-0 visit(s) not counted, listed below)")
+                f"{', '.join(files)} (each CSP counted once; {len(zero)} CSP(s) with only score-0 visits not counted, listed below)")
     ws["A2"].font = SUB_FONT
     row = 4
-    _header(ws, row, ["Done visits", "CSPs visited", "DC users", "Avg score", "Score below 80",
-                      "Compliance done", "Closures done", "Score 0 (not done)"])
+    _header(ws, row, ["Done visits (CSPs)", "Score 0 (not done)", "DC users", "Avg score", "Score below 80"])
     row += 1
-    vals = [len(u), u["CSP Code"].nunique(), u["DC User"].nunique(), round(float(u["Visit Score"].mean()), 1),
-            int((u["Visit Score"] < 80).sum()), int((u["Compliance Completed"] == "YES").sum()),
-            int((u["Closures Completed"] == "YES").sum()), len(zero)]
+    vals = [len(u), len(zero), u["DC User"].nunique(), round(float(u["Visit Score"].mean()), 1),
+            int((u["Visit Score"] < 80).sum())]
     for j, v in enumerate(vals, start=1):
         c = ws.cell(row=row, column=j, value=v)
         c.font, c.border, c.alignment = Font(bold=True, size=14, color=NAVY), BORDER, Alignment(horizontal="center")
