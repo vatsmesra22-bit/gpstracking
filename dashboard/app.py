@@ -28,6 +28,7 @@ sys.path.insert(0, str(PROJECT / "src"))
 
 from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared with the Excel Daily Update sheet)
 from csp_gps.uploads import log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
+from csp_gps.visits import LOW_SCORE  # noqa: E402
 
 try:  # DASHBOARD_PASSWORD etc. live in .env on the server
     from dotenv import load_dotenv
@@ -384,7 +385,7 @@ def visit_view(d: pd.DataFrame) -> pd.DataFrame:
 def dc_view(d: pd.DataFrame) -> pd.DataFrame:
     g = d.groupby(["DC User", "DC Name"])
     return pd.DataFrame({"Visits": g.size(), "CSPs": g["CSP Code"].nunique(), "Avg score": g["Visit Score"].mean().round(1),
-                         "Low score (<80)": g["Visit Score"].apply(lambda x: int((x < 80).sum())),
+                         f"Low score (<{LOW_SCORE})": g["Visit Score"].apply(lambda x: int((x < LOW_SCORE).sum())),
                          "Circles": g["Circle"].apply(lambda x: ", ".join(sorted(set(x))))}
                         ).sort_values("Visits", ascending=False).reset_index()
 
@@ -720,7 +721,7 @@ with tab_visits:
             st.stop()
         period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}"
         dup_rows = 0
-        low = u[u["Visit Score"] < 80]
+        low = u[u["Visit Score"] < LOW_SCORE]
         card_row([
             (card("Visits done", len(u), f"CSPs · {period}", "", "📲"), "kpi_v_all", f"📲 Visits done – {len(u)} CSPs", u, "visits"),
             (card("Score 0 (not done)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
@@ -729,7 +730,7 @@ with tab_visits:
              "kpi_v_dc", f"👥 DCs – {u['DC User'].nunique()}", u, "dc"),
             (card("Avg visit score", f"{u['Visit Score'].mean():.0f}", "out of 100", "orange", "⭐"),
              "kpi_v_score", "⭐ All visits by score (lowest first)", u.sort_values("Visit Score"), "visits"),
-            (card("Low score (<80)", len(low), "need a look", "orange", "⚠️"),
+            (card(f"Low score (<{LOW_SCORE})", len(low), "need a look", "orange", "⚠️"),
              "kpi_v_low", f"⚠️ Low-score visits – {len(low)}", low.sort_values("Visit Score"), "visits"),
         ])
         if dup_rows:
@@ -739,10 +740,10 @@ with tab_visits:
             box_title("📅 Date-wise app visits", "Newest date first · click a date to see that day's visits")
             daily = (u.groupby("Visit Date")
                      .agg(Visits=("CSP Code", "count"), CSPs=("CSP Code", "nunique"), DCs=("DC User", "nunique"),
-                          Avg_score=("Visit Score", "mean"), Low=("Visit Score", lambda x: int((x < 80).sum())))
+                          Avg_score=("Visit Score", "mean"), Low=("Visit Score", lambda x: int((x < LOW_SCORE).sum())))
                      .sort_index(ascending=False).reset_index())
             daily.insert(1, "Day", daily["Visit Date"].map(lambda d: f"{d:%A}"))
-            st.dataframe(daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score", "Low": "Score < 80"}),
+            st.dataframe(daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score", "Low": f"Score < {LOW_SCORE}"}),
                          hide_index=True, width="stretch", height=min(420, 40 + 35 * len(daily)),
                          column_config={"Date": st.column_config.DateColumn(format="DD MMM YYYY"),
                                         "Avg score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f")})
@@ -782,10 +783,12 @@ with tab_visits:
             drill(u, u["DC Name"].where(u["DC Name"] != NA, u["DC User"]), "orange", view="visits")
         with c3, st.container(border=True):
             box_title("⭐ Visit score", "Visits in each score band")
-            bands = pd.cut(u["Visit Score"], [-1, 49, 79, 89, 100], labels=["0–49", "50–79", "80–89", "90–100"])
-            drill(u, bands.astype(str), "green", view="visits", order=["90–100", "80–89", "50–79", "0–49"])
+            bands = pd.cut(u["Visit Score"], [-1, 49, LOW_SCORE - 1, 89, 100],
+                           labels=["0–49", f"50–{LOW_SCORE - 1}", f"{LOW_SCORE}–89", "90–100"])
+            drill(u, bands.astype(str), "green", view="visits",
+                  order=["90–100", f"{LOW_SCORE}–89", f"50–{LOW_SCORE - 1}", "0–49"])
             if len(low):
-                st.caption("Low-score visits (<80): " + ", ".join(sorted(low["CSP Code"].astype(str))[:12])
+                st.caption(f"Low-score visits (<{LOW_SCORE}): " + ", ".join(sorted(low["CSP Code"].astype(str))[:12])
                            + (" …" if len(low) > 12 else ""))
 
         with st.container(border=True):

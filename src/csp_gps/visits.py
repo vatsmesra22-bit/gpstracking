@@ -29,6 +29,7 @@ COLUMN_ALIASES = {
     "visit date": "Visit Date", "visit score": "Visit Score", "compliance completed": "Compliance Completed",
     "closures completed": "Closures Completed", "username": "DC User",
 }
+LOW_SCORE = 85   # a completed visit scoring below this needs a look (manager's rule)
 VISIT_COLUMNS = ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
                  "Visit Done", "Compliance Completed", "Closures Completed", "BC Code", "Duplicate Row", "Source File"]
 
@@ -74,6 +75,7 @@ def load_visit_reports(folder: Path, project_dir: Path, users_csv: Path | None =
             v[col] = NOT_AVAILABLE
     v["CSP Code"] = v["CSP Code"].astype(str).str.strip().str.upper()
     v["Circle"] = v["Circle"].fillna(NOT_AVAILABLE).astype(str).str.strip().str.title()
+    v.loc[v["Circle"].isin(["", "-", "Nan", "None"]), "Circle"] = NOT_AVAILABLE
     v["DC User"] = v["DC User"].fillna(NOT_AVAILABLE).astype(str).str.strip()
     v["DC Name"] = v["DC User"].map(users).fillna("").replace("", NOT_AVAILABLE)
     v["Visit Date"] = pd.to_datetime(v["Visit Date"], errors="coerce").dt.date

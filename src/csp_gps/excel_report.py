@@ -17,7 +17,7 @@ from . import NOT_AVAILABLE
 from .extract import CATEGORIES, OTHER
 from .labels import problem_name, status_name
 from .pipeline import ALL_COLUMNS, TRACKER_COLUMNS
-from .visits import done_csps, score_zero_csps
+from .visits import LOW_SCORE, done_csps, score_zero_csps
 
 NAVY = "1F3864"
 BLUE = "2F5597"
@@ -297,7 +297,9 @@ def _write_executive(ws, issues: pd.DataFrame, summary: dict, statuses: list[str
     visit = _rng("Visit Status", last)
     unique_csps = issues.loc[issues["CSP ID"] != NOT_AVAILABLE, "CSP ID"].nunique() if len(issues) else 0
     kpis = [
-        ("Total reported cases", f"=COUNTA({ids})", None),
+        ("Complaints (repeats removed – same as dashboard)",
+         f'=COUNTIFS({ids},"<>",{_rng("Duplicate Flag", last)},"<>Possible Duplicate")', None),
+        ("All reports incl. repeats / forwards", f"=COUNTA({ids})", None),
         ("Unique CSPs affected (where CSP ID stated)", unique_csps, "computed at generation"),
         ("Cases with no CSP ID stated", f'=COUNTIF({_rng("CSP ID", last)},"{NOT_AVAILABLE}")', None),
         ("GPS / location mismatch cases (mismatch + distance over radius)",
@@ -708,10 +710,10 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
                 f"{', '.join(files)} (each CSP counted once; {len(zero)} CSP(s) with only score-0 visits not counted, listed below)")
     ws["A2"].font = SUB_FONT
     row = 4
-    _header(ws, row, ["Done visits (CSPs)", "Score 0 (not done)", "DC users", "Avg score", "Score below 80"])
+    _header(ws, row, ["Done visits (CSPs)", "Score 0 (not done)", "DC users", "Avg score", f"Score below {LOW_SCORE}"])
     row += 1
     vals = [len(u), len(zero), u["DC User"].nunique(), round(float(u["Visit Score"].mean()), 1),
-            int((u["Visit Score"] < 80).sum())]
+            int((u["Visit Score"] < LOW_SCORE).sum())]
     for j, v in enumerate(vals, start=1):
         c = ws.cell(row=row, column=j, value=v)
         c.font, c.border, c.alignment = Font(bold=True, size=14, color=NAVY), BORDER, Alignment(horizontal="center")
@@ -735,11 +737,11 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
 
     _section(ws, row, "By visit date (newest first)")
     row += 1
-    _header(ws, row, ["Date", "Day", "Visits", "CSPs", "DC users", "Avg score", "Score < 80"])
+    _header(ws, row, ["Date", "Day", "Visits", "CSPs", "DC users", "Avg score", f"Score < {LOW_SCORE}"])
     for d, g in sorted(u.groupby("Visit Date"), key=lambda kv: kv[0], reverse=True):
         row += 1
         vals = [d, f"{d:%A}", len(g), g["CSP Code"].nunique(), g["DC User"].nunique(),
-                round(float(g["Visit Score"].mean()), 1), int((g["Visit Score"] < 80).sum())]
+                round(float(g["Visit Score"].mean()), 1), int((g["Visit Score"] < LOW_SCORE).sum())]
         for j, v in enumerate(vals, start=1):
             ws.cell(row=row, column=j, value=v).border = BORDER
         ws.cell(row=row, column=1).number_format = "dd-mmm-yyyy"
@@ -789,5 +791,5 @@ def _write_visits(ws, visits: pd.DataFrame, issues: pd.DataFrame) -> None:
             ws.cell(row=row, column=j, value=_cell_value(r[col])).border = BORDER
         ws.cell(row=row, column=2).number_format = "dd-mmm-yyyy"
     ws.auto_filter.ref = f"A{hdr}:{get_column_letter(len(cols))}{row}"
-    ws.conditional_formatting.add(f"G{hdr + 1}:G{row}", CellIsRule(operator="lessThan", formula=["80"],
+    ws.conditional_formatting.add(f"G{hdr + 1}:G{row}", CellIsRule(operator="lessThan", formula=[str(LOW_SCORE)],
                                   fill=PatternFill("solid", bgColor="F8CBAD")))

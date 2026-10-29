@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.0 – 2026-10-29 – low score 85, numbers reconciled
+
+### Changed
+- **Low score is now below 85** (it was 80). The cutoff is one constant, `LOW_SCORE` in `visits.py`, used by the
+  dashboard cards, the date-wise table, the score bands and the Excel App Visits sheet.
+- Executive Summary: the first figure is now "Complaints (repeats removed)", the same number the dashboard shows. The
+  old total including repeats / forwards is kept as a separate row.
+- A blank or "-" circle in the visit report is shown as `Not Available`.
+
+### Checked
+- Pending, solved, total and CSP counts match across the dashboard, the Daily Update sheet, `run_summary.json` and
+  `agent_brief.json`. Visit totals by date, circle and DC each add up to "Visits done".
+
 ## 1.10.0 – 2026-10-29 – each CSP counted once
 
 ### Changed
