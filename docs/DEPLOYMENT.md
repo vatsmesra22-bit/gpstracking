@@ -16,7 +16,26 @@ Goal: the dashboard runs 24×7 at `http://<server>:8501`, behind a password, and
 - **First install:** use the server package zip. It carries the data collected so far.
 - **Later updates:** use `git pull`. The data folders are never touched by Git.
 
-## Docker + nginx (Linux, recommended)
+## Live: indev.eko.in/gps-tracking (eko-deploy)
+
+The live dashboard is https://indev.eko.in/gps-tracking/. It runs on the EKO R730 through the company's `eko-deploy`
+tool, from `~/gps-tracking` on the server. The repo is `github.com/vatsmesra22-bit/gpstracking`. `eko-deploy.toml`,
+`Dockerfile.eko` and `seed/` in that folder belong to eko-deploy.
+
+To ship a change, push to `main`, then run on your PC (it asks for the server password):
+
+```bash
+ssh indev 'cd ~/gps-tracking && git pull --ff-only && eko-deploy deploy gps-tracking --no-prompt && eko-deploy status gps-tracking'
+```
+
+| Need | Command (on the server) |
+|---|---|
+| Go back to the previous release | `eko-deploy rollback gps-tracking` |
+| App logs | `eko-deploy logs gps-tracking` |
+| Releases and audit | `eko-deploy history gps-tracking` |
+| Dashboard password | `eko-deploy secret set gps-tracking DASHBOARD_PASSWORD_SHA256` |
+
+## Docker + nginx (Linux, own server)
 
 This runs three containers:
 - **dashboard** (Streamlit)
@@ -26,7 +45,7 @@ This runs three containers:
 Data stays in `input/ output/ data/ logs/` next to `docker-compose.yml`. It is never baked into the image.
 
 ```bash
-cd /opt/cps-local-agent                       # wherever the repo was cloned
+cd ~/gps-tracking                             # wherever the repo was cloned
 cp .env.example .env && nano .env             # DASHBOARD_PASSWORD_SHA256=..., OCR_ENABLED=true
 mkdir -p input output data logs
 sudo mkdir -p /srv/csp-exports                # shared folder the team drops exports into
