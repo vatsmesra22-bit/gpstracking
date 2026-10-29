@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .locations import is_location_list
 from .visits import COLUMN_ALIASES
 
 log = logging.getLogger(__name__)
@@ -76,6 +77,15 @@ def _looks_like_visit_report(name: str, data: bytes) -> bool:
     return {"CSP Code", "Visit Date"} <= cols
 
 
+def _looks_like_location_list(name: str, data: bytes) -> bool:
+    try:
+        frame = (pd.read_csv(io.BytesIO(data), nrows=5, dtype=str) if name.lower().endswith(".csv")
+                 else pd.read_excel(io.BytesIO(data), nrows=5, dtype=str))
+    except Exception:
+        return False
+    return is_location_list(frame)
+
+
 def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
     """Check one uploaded file and store it where the pipeline reads it."""
     safe = _safe_name(name)
@@ -86,12 +96,14 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
         if not _looks_like_export(safe, data):
             return UploadResult(safe, False, "Yeh WhatsApp chat export nahi lag raha (chat ki .txt nahi mili).")
         dest_dir, kind = input_dir, "WhatsApp export"
+    elif suffix in REPORT_SUFFIXES and _looks_like_location_list(safe, data):
+        dest_dir, kind = input_dir / "csp_locations", "CSP location list"
     elif suffix in REPORT_SUFFIXES:
         if not _looks_like_visit_report(safe, data):
             return UploadResult(safe, False, "Yeh SBI visit report nahi lag rahi ('CSP Code' aur 'Visit Date' column nahi mile).")
         dest_dir, kind = input_dir / "visit_reports", "Visit report"
     else:
-        return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .csv (visit report) daaliye.")
+        return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .csv (visit report / CSP location list) daaliye.")
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     sha = _sha(data)

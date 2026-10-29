@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.12.0 – 2026-10-29 – CSP Locations tab
+
+### Added
+- **📍 CSP Locations** tab. It shows the lat/long each CSP sent, with:
+  - a Google Maps link
+  - the CSP's complaints (total / pending)
+  - its latest completed SBI app visit
+  - a check flag for points outside India or missing
+  Phone numbers are masked, and each CSP is shown once (latest row).
+- Location lists (.csv / .xlsx with CSP Code + Latitude/Longitude, or one "Lat, Long" column) can be added with the
+  upload box. They are saved in `input/csp_locations/`. Code is in `src/csp_gps/locations.py`, and the merged list is
+  written to `output/csp_locations.csv`.
+
 ## 1.11.1 – 2026-10-29
 
 ### Changed

@@ -28,6 +28,7 @@ from .extract import (
     is_resolution_reply,
     mask_phone,
 )
+from .locations import load_locations, merge_locations
 from .media import Evidence, OcrEngine, phash_distance, process_attachment
 from .parser import Message, discover_and_parse
 from .state import StateStore
@@ -410,6 +411,10 @@ def run(settings: Settings) -> dict:
     prev = pd.read_csv(prev_csv, dtype=str, keep_default_na=False) if prev_csv.exists() else None
     brief = build_brief(issues, prev, settings.agent_contacts)
     summary["agent"] = brief["counts"]
+    locations = merge_locations(load_locations(settings.input_dir / "csp_locations", settings.project_dir),
+                                issues, done_visits(visits))
+    summary["csp_locations"] = int(len(locations))
+    locations.to_csv(settings.output_dir / "csp_locations.csv", index=False, encoding="utf-8-sig")
     _write_outputs(issues, ev_df, summary, settings, visits)
     write_brief(brief, settings.output_dir)
     store.log_run({k: v for k, v in summary.items() if k not in ("files_parsed",)})

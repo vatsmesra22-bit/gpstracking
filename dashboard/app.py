@@ -319,6 +319,21 @@ def load(data_dir: str, mtime: float):
     return df, visits, summary, brief
 
 
+@st.cache_data(show_spinner=False)
+def load_locations(data_dir: str, mtime: float) -> pd.DataFrame:
+    f = Path(data_dir) / "csp_locations.csv"
+    if not f.exists() or f.stat().st_size < 5:
+        return pd.DataFrame()
+    loc = pd.read_csv(f, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    for col in ("Latitude", "Longitude"):
+        loc[col] = pd.to_numeric(loc[col], errors="coerce")
+    for col in ("Complaints", "Pending Complaints"):
+        loc[col] = pd.to_numeric(loc[col], errors="coerce").fillna(0).astype(int)
+    received = pd.to_datetime(loc["Received"].replace("", None), errors="coerce") + pd.Timedelta(hours=5, minutes=30)
+    loc["Received (IST)"] = received.dt.strftime("%d %b %H:%M").fillna("")
+    return loc
+
+
 def evidence_file(data_dir: Path, rel: str) -> Path | None:
     """Only show files from this data folder's evidence directory."""
     if not rel:
@@ -390,7 +405,8 @@ def dc_view(d: pd.DataFrame) -> pd.DataFrame:
                         ).sort_values("Visits", ascending=False).reset_index()
 
 
-VIEWS = {"complaints": complaint_view, "csp": csp_view, "visits": visit_view, "dc": dc_view}
+VIEWS = {"complaints": complaint_view, "csp": csp_view, "visits": visit_view, "dc": dc_view,
+         "locations": lambda d: d}
 
 
 @st.dialog("📂 Details", width="large")
@@ -406,7 +422,8 @@ def show_list(title: str, frame: pd.DataFrame, kind: str = "complaints") -> None
                                 "Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
                                 "Days": st.column_config.NumberColumn(format="%d d"),
                                 "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d"),
-                                "What to do": st.column_config.TextColumn(width="large")})
+                                "What to do": st.column_config.TextColumn(width="large"),
+                                "Map": st.column_config.LinkColumn("Map", display_text="📍 Open")})
     slug = "".join(ch if ch.isalnum() else "_" for ch in title.lower()).strip("_")[:40] or "list"
     st.download_button("⬇ Download Excel", to_excel(view, "List"), f"{slug}.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -573,6 +590,7 @@ if len(names) > 1:
 
 loaded_mtime = (chosen / "issues.csv").stat().st_mtime
 df, visits, summary, brief = load(str(chosen), loaded_mtime)
+locations = load_locations(str(chosen), loaded_mtime)
 
 
 @st.fragment(run_every="60s")
@@ -622,8 +640,8 @@ f = f.sort_values(["_rank", "Message Date"])
 
 open_ = f["Status"].isin(["Pending", "Escalated"])
 
-tab_home, tab_agent, tab_list, tab_visits, tab_photos = st.tabs(
-    ["🏠 Overview", "🤖 Agent", "📋 Complaints", "🗓 App Visits", "🖼 Photos"])
+tab_home, tab_agent, tab_list, tab_visits, tab_locations, tab_photos = st.tabs(
+    ["🏠 Overview", "🤖 Agent", "📋 Complaints", "🗓 App Visits", "📍 CSP Locations", "🖼 Photos"])
 
 
 # --- Overview -------------------------------------------------------------------------------------------------
@@ -808,6 +826,47 @@ with tab_visits:
                                         "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
                                                                                        format="%d")})
             st.download_button("⬇ Visits Excel", to_excel(vview, "App Visits"), "csp_app_visits.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# --- CSP Locations ----------------------------------------------------------------------------------------------
+LOCATION_VIEW = ["CSP Code", "CSP Name", "Number", "Latitude", "Longitude", "Map", "Received (IST)", "Complaints",
+                 "Pending Complaints", "Last App Visit", "Location Check", "Reply"]
+LOCATION_COLS = {"Map": st.column_config.LinkColumn("Map", display_text="📍 Open"),
+                 "Latitude": st.column_config.NumberColumn(format="%.6f"),
+                 "Longitude": st.column_config.NumberColumn(format="%.6f")}
+
+with tab_locations:
+    if locations.empty:
+        st.info("Abhi CSP location list nahi hai. Left side '📤 Naya data daalo' mein CSP location wali Excel / CSV daaliye "
+                "(columns: CSP Code, Latitude, Longitude).")
+    else:
+        st.markdown(
+            "<div class='today quiet'><div class='today-h'>📍 CSPs ne apni location (lat, long) bheji</div>"
+            "<div class='small-note'>Har CSP ek baar (latest) · complaint aur SBI app visit ke saath jodi gayi · "
+            "📍 Open se Google Maps khulega · phone numbers hidden</div></div>", unsafe_allow_html=True)
+        check = locations[locations["Location Check"] != "OK"]
+        with_complaint = locations[locations["Complaints"] > 0]
+        visited = locations[locations["Last App Visit"] != ""]
+        card_row([
+            (card("CSPs with location", len(locations), "lat / long mili", "", "📍"),
+             "kpi_l_all", f"📍 CSP locations – {len(locations)}", locations[LOCATION_VIEW], "locations"),
+            (card("Complaint wale", len(with_complaint), "in CSPs ki complaint hai", "orange", "📨"),
+             "kpi_l_cmp", f"📨 Complaint wale CSPs – {len(with_complaint)}", with_complaint[LOCATION_VIEW], "locations"),
+            (card("App visit hui", len(visited), "SBI app mein visit dikhi", "green", "✅"),
+             "kpi_l_vis", f"✅ App visit hui – {len(visited)}", visited[LOCATION_VIEW], "locations"),
+            (card("Check karo", len(check), "location India ke bahar / missing", "red", "⚠️"),
+             "kpi_l_chk", f"⚠️ Location check – {len(check)}", check[LOCATION_VIEW], "locations"),
+        ])
+        with st.container(border=True):
+            box_title("📋 Saari CSP locations", "Search: CSP code, naam ya jagah")
+            lq = st.text_input("Search locations", placeholder="🔍 CSP code, naam…", label_visibility="collapsed")
+            lt = locations if not lq else locations[locations.astype(str).apply(
+                lambda c: c.str.contains(lq, case=False, regex=False)).any(axis=1)]
+            st.dataframe(lt[LOCATION_VIEW], hide_index=True, width="stretch", height=min(620, 40 + 35 * len(lt)),
+                         column_config=LOCATION_COLS)
+            st.download_button("⬇ Locations Excel", to_excel(lt[LOCATION_VIEW].drop(columns="Map"), "CSP Locations"),
+                               "csp_locations.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 

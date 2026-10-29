@@ -330,3 +330,23 @@ def test_each_csp_counted_once_in_visit_totals(tmp_path):
     v, _ = load_visit_reports(folder, tmp_path)
     assert sorted(done_csps(v)["CSP Code"]) == ["1A000001", "1A000003"]   # visited twice -> counted once
     assert list(score_zero_csps(v)["CSP Code"]) == ["1A000002"]            # 1A000003 later completed
+
+
+# --- CSP location list ------------------------------------------------------------------------------------
+def test_csp_locations_load_mask_and_merge(tmp_path):
+    from csp_gps.locations import load_locations, merge_locations
+    from csp_gps.uploads import save_upload
+
+    csv = (b"CSP Code,Name,Number,\"Lat, Long\",Other reply\n"
+           b"1A852327,Anuj Kumar,917983534146,\"28.9486537, 78.5371186\",\n"
+           b"1A000009,Far Away,919000000001,\"51.5, -0.12\",sent an image\n")
+    r = save_upload("locations.csv", csv, tmp_path / "input")
+    assert r.ok and (tmp_path / "input" / "csp_locations" / "locations.csv").exists()
+    loc = load_locations(tmp_path / "input" / "csp_locations", tmp_path)
+    assert len(loc) == 2 and "7983534146" not in " ".join(loc["Number"])
+    assert dict(zip(loc["CSP Code"], loc["Location Check"], strict=True))["1A000009"].startswith("Check")
+    issues = pd.DataFrame({"CSP ID": ["1A852327"], "Duplicate Flag": ["Unique"], "Resolution Status": ["Open"]})
+    done = pd.DataFrame({"CSP Code": ["1A852327"], "Visit Date": ["2026-10-24"]})
+    m = merge_locations(loc, issues, done).set_index("CSP Code")
+    assert m.loc["1A852327", "Pending Complaints"] == 1 and m.loc["1A852327", "Last App Visit"] == "2026-10-24"
+    assert m.loc["1A852327", "Map"].startswith("https://maps.google.com/?q=28.9486537")
