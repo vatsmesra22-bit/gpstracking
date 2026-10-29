@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0 – 2026-10-29 – upload box
+
+### Added
+- **📤 Naya data daalo** box in the dashboard sidebar (on when `CSP_UPLOADS=1`, as set in `eko-deploy.toml`). It
+  takes WhatsApp exports (.zip / .txt) and SBI visit reports (.xlsx / .csv), checks each file, skips one that is
+  already there, and rebuilds the report at once. Uploads are logged in `logs/uploads.log`
+  (`src/csp_gps/uploads.py`).
+- The upload limit is 10 MB, matching the indev nginx route.
+
 ## 1.8.0 – 2026-10-29 – pending-only overview, more privacy
 
 ### Changed

@@ -27,6 +27,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT / "src"))
 
 from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared with the Excel Daily Update sheet)
+from csp_gps.uploads import log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
 
 try:  # DASHBOARD_PASSWORD etc. live in .env on the server
     from dotenv import load_dotenv
@@ -521,9 +522,43 @@ def sign_out_bar() -> None:
         st.rerun()
 
 
+UPLOADS_ON = uploads_enabled(os.environ)
+
+
+def upload_box() -> None:
+    """Sidebar box to add a WhatsApp export or SBI visit report and rebuild the report (CSP_UPLOADS=1)."""
+    if not UPLOADS_ON:
+        return
+    with st.sidebar, st.container(border=True, key="upload_box"):
+        st.markdown("### 📤 Naya data daalo")
+        st.caption("WhatsApp export (.zip / .txt) ya SBI visit report (.xlsx). Max 10 MB.")
+        files = st.file_uploader("Files", type=["zip", "txt", "xlsx", "csv"], accept_multiple_files=True,
+                                 label_visibility="collapsed", key=f"up_{st.session_state.get('up_round', 0)}")
+        if st.button("Upload & update", key="upload_btn", width="stretch", disabled=not files, type="primary"):
+            results = [save_upload(f.name, f.getvalue(), PROJECT / "input") for f in files]
+            log_upload(PROJECT / "logs", results)
+            ok, tail = (False, "")
+            if any(r.ok for r in results):
+                with st.spinner("Report ban rahi hai… (1–2 minute)"):
+                    ok, tail = run_report(PROJECT)
+            st.session_state["upload_msgs"] = ([(r.ok, f"{r.name}: {r.message}") for r in results]
+                                               + ([(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")]
+                                                  if any(r.ok for r in results) else []))
+            st.session_state["upload_tail"] = "" if ok else tail
+            st.session_state["up_round"] = st.session_state.get("up_round", 0) + 1  # clears the picker
+            st.rerun()
+        for good, msg in st.session_state.get("upload_msgs", []):
+            (st.success if good else st.warning)(msg)
+        if st.session_state.get("upload_tail"):
+            st.code(st.session_state["upload_tail"], language=None)
+
+
+upload_box()
+
 if not dirs:
     header("")
-    st.info("No data yet. Put the WhatsApp export in Downloads and double-click 'Update Report.bat'.")
+    st.info("Abhi data nahi hai. Left side '📤 Naya data daalo' mein WhatsApp export daaliye"
+            if UPLOADS_ON else "No data yet. Put the WhatsApp export in Downloads and double-click 'Update Report.bat'.")
     st.stop()
 
 default = cli_data_dir()
@@ -550,7 +585,8 @@ _watch_for_new_data()
 is_test = summary.get("data_source") == "SYNTHETIC TEST DATA"
 start, end = summary.get("period_start") or "—", summary.get("period_end") or "—"
 header(f"<span class='chip'>📅 {start} → {end}</span><br><span class='live'><span class='dot'></span>"
-       f"Updated {str(summary.get('generated_at', '')).replace('T', ' ')[:16]} · auto 10:00 &amp; 15:00</span>")
+       f"Updated {str(summary.get('generated_at', '')).replace('T', ' ')[:16]} · "
+       f"{'📤 upload se update' if UPLOADS_ON else 'auto 10:00 &amp; 15:00'}</span>")
 if is_test:
     st.markdown("<div class='test'>⚠ TEST DATA – these are not real complaints.</div>", unsafe_allow_html=True)
 if df.empty:

@@ -286,3 +286,31 @@ def test_personal_ids_masked_and_csp_forms_skipped():
             "Aadhaar Number 1 PAN Number 2 Latitude 26.6317 Longitude 83.8982")
     assert not is_relevant(form)
     assert is_relevant("CSP visit 1A852434 Remark - CSP not mapped Latitude 27.724919 Longitude 80.440413")
+
+
+# --- dashboard upload box --------------------------------------------------------------------------------
+def test_upload_box_saves_checks_and_skips_repeats(tmp_path):
+    import io
+    import zipfile
+
+    from csp_gps.uploads import save_upload, uploads_enabled
+
+    assert uploads_enabled({"CSP_UPLOADS": "1"}) and not uploads_enabled({})
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("chat.txt", "[10/27/26, 4:00:00 PM] Ajay: 1A850933 location issue\n")
+    export = buf.getvalue()
+    first = save_upload("Kiosk Team Eko.zip", export, tmp_path)
+    assert first.ok and (tmp_path / "Kiosk Team Eko.zip").exists()
+    assert not save_upload("copy.zip", export, tmp_path).ok                 # same content -> skipped
+    assert not save_upload("photo.zip", b"not a zip", tmp_path).ok          # not an export
+    assert not save_upload("../../evil.exe", b"x", tmp_path).ok             # wrong type
+    assert save_upload("../x/../Kiosk Team Eko.zip", export + b"", tmp_path).ok is False
+
+    report = io.BytesIO()
+    pd.DataFrame({"CSP Code": ["1A000001"], "Visit Date": ["2026-10-08"], "Visit Score": [90]}).to_excel(report, index=False)
+    r = save_upload("Visit report 1st Oct to 28th Oct.xlsx", report.getvalue(), tmp_path)
+    assert r.ok and (tmp_path / "visit_reports" / "Visit report 1st Oct to 28th Oct.xlsx").exists()
+    other = io.BytesIO()
+    pd.DataFrame({"Name": ["x"]}).to_excel(other, index=False)
+    assert not save_upload("random.xlsx", other.getvalue(), tmp_path).ok
