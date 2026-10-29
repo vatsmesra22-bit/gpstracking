@@ -630,9 +630,14 @@ tab_home, tab_agent, tab_list, tab_visits, tab_photos = st.tabs(
 with tab_home:
     # only the pending complaints: what still needs action, most urgent first
     pending = f[open_]
+    solved = f[f["Status"].isin(["Solved", "Not a problem"])]
     card_row([
+        (card("Total complaints", len(f), "pending + solved", "", "📨"),
+         "kpi_total", f"📨 All complaints – {len(f)}", f, "complaints"),
         (card("Pending complaints", len(pending), "not solved yet", "orange", "⏳"),
          "kpi_pending", f"⏳ Pending – {len(pending)}", pending, "complaints"),
+        (card("Solved", len(solved), "done / closed", "green", "✅"),
+         "kpi_solved", f"✅ Solved – {len(solved)}", solved, "complaints"),
     ])
     with st.container(border=True):
         box_title(f"⏳ Pending complaints – {len(pending)}", "Sabse zaroori upar · poori detail 📋 Complaints tab mein")

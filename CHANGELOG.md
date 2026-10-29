@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.1 – 2026-10-29
+
+### Changed
+- Overview shows Total, Pending and Solved cards (total = pending + solved); the list below is still only the pending complaints.
+
 ## 1.11.0 – 2026-10-29 – low score 85, numbers reconciled
 
 ### Changed
