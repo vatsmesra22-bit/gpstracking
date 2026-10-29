@@ -27,6 +27,8 @@ PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT / "src"))
 
 from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared with the Excel Daily Update sheet)
+from csp_gps.locations import load_locations as read_locations  # noqa: E402
+from csp_gps.locations import merge_locations  # noqa: E402
 from csp_gps.uploads import log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
 from csp_gps.visits import LOW_SCORE  # noqa: E402
 
@@ -321,17 +323,25 @@ def load(data_dir: str, mtime: float):
 
 @st.cache_data(show_spinner=False)
 def load_locations(data_dir: str, mtime: float) -> pd.DataFrame:
-    f = Path(data_dir) / "csp_locations.csv"
-    if not f.exists() or f.stat().st_size < 5:
-        return pd.DataFrame()
-    loc = pd.read_csv(f, dtype=str, keep_default_na=False, encoding="utf-8-sig")
-    for col in ("Latitude", "Longitude"):
-        loc[col] = pd.to_numeric(loc[col], errors="coerce")
-    for col in ("Complaints", "Pending Complaints"):
-        loc[col] = pd.to_numeric(loc[col], errors="coerce").fillna(0).astype(int)
+    """CSP locations from config/csp_locations.csv + uploaded lists, joined to the current complaints and visits.
+    Built here (not only by process.py) so the tab works right after a deploy, without a report run."""
+    issues, visits_, _, _ = load(data_dir, mtime)
+    done = (visits_[(visits_["Duplicate Row"] == "No") & (visits_["Visit Done"] != "No")]
+            if len(visits_) else pd.DataFrame(columns=["CSP Code", "Visit Date"]))
+    loc = merge_locations(read_locations(PROJECT / "input" / "csp_locations", PROJECT), issues, done)
+    if loc.empty:
+        return loc
+    loc["Last App Visit"] = loc["Last App Visit"].map(lambda d: f"{d:%d %b %Y}" if pd.notna(d) and d != "" else "")
     received = pd.to_datetime(loc["Received"].replace("", None), errors="coerce") + pd.Timedelta(hours=5, minutes=30)
     loc["Received (IST)"] = received.dt.strftime("%d %b %H:%M").fillna("")
     return loc
+
+
+def location_view(loc: pd.DataFrame) -> pd.DataFrame:
+    """The location columns to show, leaving out ones that are empty for every CSP (e.g. names not shipped)."""
+    keep = [c for c in LOCATION_VIEW if c in ("CSP Code", "Map") or
+            not loc[c].astype(str).isin(["", "nan", "None", NA]).all()]
+    return loc[keep]
 
 
 def evidence_file(data_dir: Path, rel: str) -> Path | None:
@@ -850,22 +860,22 @@ with tab_locations:
         visited = locations[locations["Last App Visit"] != ""]
         card_row([
             (card("CSPs with location", len(locations), "lat / long mili", "", "📍"),
-             "kpi_l_all", f"📍 CSP locations – {len(locations)}", locations[LOCATION_VIEW], "locations"),
+             "kpi_l_all", f"📍 CSP locations – {len(locations)}", location_view(locations), "locations"),
             (card("Complaint wale", len(with_complaint), "in CSPs ki complaint hai", "orange", "📨"),
-             "kpi_l_cmp", f"📨 Complaint wale CSPs – {len(with_complaint)}", with_complaint[LOCATION_VIEW], "locations"),
+             "kpi_l_cmp", f"📨 Complaint wale CSPs – {len(with_complaint)}", location_view(with_complaint), "locations"),
             (card("App visit hui", len(visited), "SBI app mein visit dikhi", "green", "✅"),
-             "kpi_l_vis", f"✅ App visit hui – {len(visited)}", visited[LOCATION_VIEW], "locations"),
+             "kpi_l_vis", f"✅ App visit hui – {len(visited)}", location_view(visited), "locations"),
             (card("Check karo", len(check), "location India ke bahar / missing", "red", "⚠️"),
-             "kpi_l_chk", f"⚠️ Location check – {len(check)}", check[LOCATION_VIEW], "locations"),
+             "kpi_l_chk", f"⚠️ Location check – {len(check)}", location_view(check), "locations"),
         ])
         with st.container(border=True):
             box_title("📋 Saari CSP locations", "Search: CSP code, naam ya jagah")
             lq = st.text_input("Search locations", placeholder="🔍 CSP code, naam…", label_visibility="collapsed")
             lt = locations if not lq else locations[locations.astype(str).apply(
                 lambda c: c.str.contains(lq, case=False, regex=False)).any(axis=1)]
-            st.dataframe(lt[LOCATION_VIEW], hide_index=True, width="stretch", height=min(620, 40 + 35 * len(lt)),
+            st.dataframe(location_view(lt), hide_index=True, width="stretch", height=min(620, 40 + 35 * len(lt)),
                          column_config=LOCATION_COLS)
-            st.download_button("⬇ Locations Excel", to_excel(lt[LOCATION_VIEW].drop(columns="Map"), "CSP Locations"),
+            st.download_button("⬇ Locations Excel", to_excel(location_view(lt).drop(columns="Map"), "CSP Locations"),
                                "csp_locations.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.1 – 2026-10-29
+
+### Changed
+- `config/csp_locations.csv` ships the 27 CSP locations from 23–24 Oct, with CSP code and lat/long only (no names or
+  numbers), so the 📍 CSP Locations tab works right after deploy without an upload. Uploaded lists still add to it or
+  override it.
+- The dashboard builds the locations list itself, and hides columns that are empty for every CSP.
+
 ## 1.12.0 – 2026-10-29 – CSP Locations tab
 
 ### Added

@@ -36,22 +36,26 @@ def is_location_list(frame: pd.DataFrame) -> bool:
 
 
 def load_locations(folder: Path, project_dir: Path) -> pd.DataFrame:
+    """config/csp_locations.csv (CSP code + lat/long, shipped with the app) first, then any uploaded lists in
+    `folder`; a later list wins for the same CSP."""
     frames = []
+    paths = [project_dir / "config" / "csp_locations.csv"]
     if folder.exists():
-        for path in sorted(folder.iterdir()):
-            if path.suffix.lower() not in {".csv", ".xlsx"} or path.name.startswith("~$"):
-                continue
-            try:
-                raw = pd.read_csv(path, dtype=str) if path.suffix.lower() == ".csv" else pd.read_excel(path, dtype=str)
-            except Exception as exc:
-                log.warning("Could not read CSP location list %s: %s", path.name, exc)
-                continue
-            raw = normalise_columns(raw)
-            if "LatLong" in raw.columns and "Latitude" not in raw.columns:
-                parts = raw["LatLong"].astype(str).str.split(",", n=1, expand=True)
-                raw["Latitude"], raw["Longitude"] = parts[0], parts.get(1)
-            raw["Source File"] = path.relative_to(project_dir).as_posix() if path.is_relative_to(project_dir) else path.name
-            frames.append(raw)
+        paths += sorted(folder.iterdir())
+    for path in paths:
+        if not path.is_file() or path.suffix.lower() not in {".csv", ".xlsx"} or path.name.startswith("~$"):
+            continue
+        try:
+            raw = pd.read_csv(path, dtype=str) if path.suffix.lower() == ".csv" else pd.read_excel(path, dtype=str)
+        except Exception as exc:
+            log.warning("Could not read CSP location list %s: %s", path.name, exc)
+            continue
+        raw = normalise_columns(raw)
+        if "LatLong" in raw.columns and "Latitude" not in raw.columns:
+            parts = raw["LatLong"].astype(str).str.split(",", n=1, expand=True)
+            raw["Latitude"], raw["Longitude"] = parts[0], parts.get(1)
+        raw["Source File"] = path.relative_to(project_dir).as_posix() if path.is_relative_to(project_dir) else path.name
+        frames.append(raw)
     if not frames:
         return pd.DataFrame(columns=LOCATION_COLUMNS)
     loc = pd.concat(frames, ignore_index=True)
@@ -68,7 +72,7 @@ def load_locations(folder: Path, project_dir: Path) -> pd.DataFrame:
     (lat_lo, lat_hi), (lon_lo, lon_hi) = INDIA
     ok = loc["Latitude"].between(lat_lo, lat_hi) & loc["Longitude"].between(lon_lo, lon_hi)
     loc["Location Check"] = ok.map({True: "OK", False: "Check – not in India / missing"})
-    loc = loc.sort_values(["CSP Code", "Received"]).drop_duplicates("CSP Code", keep="last")
+    loc = loc.drop_duplicates("CSP Code", keep="last").sort_values("CSP Code", kind="stable")
     return loc[LOCATION_COLUMNS].reset_index(drop=True)
 
 
