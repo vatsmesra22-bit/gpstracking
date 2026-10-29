@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 – 2026-10-29 – pending-only overview, more privacy
+
+### Changed
+- **Overview tab** now shows only the pending complaints: one count card plus the full list, most urgent first. The
+  other overview cards and lists were removed. The full detail stays in the Complaints tab.
+- **Masking** now also hides Aadhaar, PAN, bank account numbers and e-mail addresses, not only phone numbers.
+- **CSP onboarding / replacement forms** pasted in the group (Aadhaar, PAN, Gram Panchayat …) are no longer counted as
+  complaints.
+
 ## 1.7.0 – 2026-10-26 – score 0 visits
 
 ### Changed

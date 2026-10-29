@@ -274,3 +274,15 @@ def test_score_zero_visits_not_counted(tmp_path):
     assert sorted(done["CSP Code"]) == ["1A000001", "1A000003"]  # the 90 row is kept, not the 0 repeat
     assert done.loc[done["CSP Code"] == "1A000001", "Visit Score"].item() == 90
     assert list(zero["CSP Code"]) == ["1A000002"]
+
+
+def test_personal_ids_masked_and_csp_forms_skipped():
+    from csp_gps.extract import is_relevant, mask_phone
+
+    out = mask_phone("Aadhaar 4159 5017 6835 PAN ABCDE1234F A/C 34028031763 mail ravi.k@gmail.com lat 26.6317 CSP 1A850933")
+    assert "4159" not in out and "ABCDE1234F" not in out and "340280" not in out and "ravi.k@" not in out
+    assert "6835" in out and "26.6317" in out and "1A850933" in out
+    form = ("Code of Replacement National BC Code 1A850933 Gram Panchayat X Pin Code 274408 "
+            "Aadhaar Number 1 PAN Number 2 Latitude 26.6317 Longitude 83.8982")
+    assert not is_relevant(form)
+    assert is_relevant("CSP visit 1A852434 Remark - CSP not mapped Latitude 27.724919 Longitude 80.440413")

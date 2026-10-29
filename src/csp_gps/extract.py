@@ -107,12 +107,26 @@ ROLE_HINTS = [
 PHONE = re.compile(r"(?<!\d)(\+?91[\s\-]?)?([6-9]\d{2})[\s\-]?(\d{2})[\s\-]?(\d{2})[\s\-]?(\d{3})(?!\d)")
 
 
+AADHAAR = re.compile(r"(?<![\d.])\d{4}[ \-]?\d{4}[ \-]?\d{4}(?![\d.])")
+PAN = re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b")
+LONG_NUMBER = re.compile(r"(?<![\d.])\d{9,18}(?![\d.])")   # bank account numbers and similar IDs
+EMAIL = re.compile(r"\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+\.[A-Za-z0-9.-]+)\b")
+
+
 def mask_phone(text: str) -> str:
-    """+91 98765 43210 -> +91 98XXX XX210. Keeps enough to tell numbers apart, not to dial them."""
+    """Hide personal numbers before anything is written out.
+
+    Phone +91 98765 43210 -> +91 98XXX XX210 (enough to tell numbers apart, not to dial them).
+    Aadhaar, PAN, bank account numbers and e-mail addresses that DCs paste from CSP forms are masked too.
+    """
     def repl(m: re.Match) -> str:
         prefix = (m.group(1) or "").strip()
         return f"{prefix + ' ' if prefix else ''}{m.group(2)[:2]}XXX XX{m.group(5)}"
-    return PHONE.sub(repl, text or "")
+    text = PHONE.sub(repl, text or "")
+    text = AADHAAR.sub(lambda m: "XXXX XXXX " + re.sub(r"\D", "", m.group())[-4:], text)
+    text = PAN.sub(lambda m: "XXXXXXXXX" + m.group()[-1], text)
+    text = LONG_NUMBER.sub(lambda m: "X" * (len(m.group()) - 4) + m.group()[-4:], text)
+    return EMAIL.sub(lambda m: f"{m.group(1)}***@{m.group(2)}", text)
 
 
 @dataclass
@@ -148,7 +162,15 @@ NOTICE = re.compile(r"\bregarding the location issue\b|\bplease ensure\b|\bkindl
                     r"@all\b|\bplease refer\b|\bkindly refer\b|\bvia mail\b|play\.google\.com|https?://", re.I)
 
 
+# CSP onboarding / replacement forms ("Aadhaar Number ... PAN Number ... Latitude ...") carry coordinates but
+# report no visit problem.
+FORM_FIELDS = re.compile(r"\b(?:aadhaar\s+number|pan\s+number|date\s+of\s+birth|commission\s+a/?c|national\s+bc\s+(?:code|name)|"
+                         r"code\s+of\s+replacement|gram\s+panchayat|population\s+category|vtc\s+code|pin\s+code)\b", re.I)
+
+
 def is_relevant(text: str) -> bool:
+    if len(set(m.lower() for m in FORM_FIELDS.findall(text))) >= 3:
+        return False
     if INSTRUCTION.search(text) and not DISTANCE.search(text) and not COORD.search(text):
         return False  # team instructions ("please share CSP ID with location issues") are not complaints
     if NOTICE.search(text) and not CSP_CODE.search(text):

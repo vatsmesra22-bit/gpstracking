@@ -17,7 +17,6 @@ import io
 import json
 import os
 import sys
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -221,27 +220,7 @@ st.markdown(f"""
            padding:14px 18px; margin-bottom:16px;}}
   .today.quiet {{border-left-color:{FOREST};}}
   .today-h {{font-family:"Plus Jakarta Sans", sans-serif; font-weight:700; font-size:1.05rem; color:{INK}; margin-bottom:8px;}}
-  .chip-more {{display:inline-block; background:{HEADER_BG}; color:#fff; border-radius:999px; padding:5px 12px;
-               margin:0 8px 6px 0; font-size:0.88rem; font-weight:600;}}
-  .chip-new {{display:inline-block; background:rgba(230,155,26,0.12); color:#8A5A00; border-radius:999px;
-              padding:5px 12px; margin:0 8px 6px 0; font-size:0.88rem;}}
   .small-note {{font-size:0.85rem; color:{MUTED};}}
-
-  .prio-strip {{display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:10px; margin:6px 0 12px;}}
-  @media (max-width: 900px) {{ .prio-strip {{grid-template-columns:repeat(2, minmax(0,1fr));}} }}
-  .prio {{border-radius:16px; padding:14px 16px; color:#fff; position:relative; overflow:hidden;
-           box-shadow:0 8px 18px rgba(12,18,23,0.10); transition:transform .18s ease;}}
-  .prio:hover {{transform:translateY(-2px);}}
-  .prio::after {{content:""; position:absolute; right:-30px; top:-30px; width:110px; height:110px; border-radius:50%;
-                 background:rgba(255,255,255,0.14);}}
-  .prio.p0 {{background:linear-gradient(135deg, #E0533F, #B4281B);}}
-  .prio.p1 {{background:linear-gradient(135deg, #8B6BD8, #5B3DA6);}}
-  .prio.p2 {{background:linear-gradient(135deg, #F2B544, #DD8A0E);}}
-  .prio.p3 {{background:linear-gradient(135deg, #22A9E0, #0072A8);}}
-  .prio.p4 {{background:linear-gradient(135deg, #2E8B62, #17533A);}}
-  .prio .h {{font-weight:700; font-size:0.92rem; opacity:0.95;}}
-  .prio .c {{font-weight:800; font-size:2rem; line-height:1.15; letter-spacing:-1px;}}
-  .prio .d {{font-size:0.76rem; opacity:0.9;}}
 
   .cc {{display:grid; grid-template-columns:150px 1fr 260px; gap:16px; align-items:center; background:#fff;
          border:1px solid {BORDER}; border-left:6px solid var(--c); border-radius:14px; padding:12px 16px; margin-bottom:10px;
@@ -605,8 +584,6 @@ if not show_dupes:
 f = f.sort_values(["_rank", "Message Date"])
 
 open_ = f["Status"].isin(["Pending", "Escalated"])
-known_csp = f.loc[f["CSP"] != NOT_MENTIONED, "CSP"]
-counts = f["Priority"].value_counts()
 
 tab_home, tab_agent, tab_list, tab_visits, tab_photos = st.tabs(
     ["🏠 Overview", "🤖 Agent", "📋 Complaints", "🗓 App Visits", "🖼 Photos"])
@@ -614,47 +591,18 @@ tab_home, tab_agent, tab_list, tab_visits, tab_photos = st.tabs(
 
 # --- Overview -------------------------------------------------------------------------------------------------
 with tab_home:
-    # --- big numbers -------------------------------------------------------------------------------------------
+    # only the pending complaints: what still needs action, most urgent first
+    pending = f[open_]
     card_row([
-        (card("Total complaints", len(f), f"{f['Group/Chat'].nunique()} chat(s) · {f['Reported By'].nunique()} people", "", "📨"),
-         "kpi_total", f"📨 All complaints – {len(f)}", f, "complaints"),
-        (card("Pending", int(open_.sum()), "not solved yet", "orange", "⏳"),
-         "kpi_pending", f"⏳ Pending – {int(open_.sum())}", f[open_], "complaints"),
-        (card("Escalate now", int(counts.get("🔴 Escalate", 0)), "pending 5+ days", "red", "🚨"),
-         "kpi_escalate", f"🚨 Escalate now – {int(counts.get('🔴 Escalate', 0))}", f[f["Priority"] == "🔴 Escalate"], "complaints"),
-        (card("Solved", int((f["Status"] == "Solved").sum()), "confirmed in WhatsApp", "green", "✅"),
-         "kpi_solved", f"✅ Solved – {int((f['Status'] == 'Solved').sum())}", f[f["Status"] == "Solved"], "complaints"),
-        (card("CSPs affected", known_csp.nunique(), f"{int((f['CSP'] == NOT_MENTIONED).sum())} without CSP ID", "purple", "🏪"),
-         "kpi_csps", f"🏪 CSPs affected – {known_csp.nunique()}", f[f["CSP"] != NOT_MENTIONED], "csp"),
+        (card("Pending complaints", len(pending), "not solved yet", "orange", "⏳"),
+         "kpi_pending", f"⏳ Pending – {len(pending)}", pending, "complaints"),
     ])
-
-    # --- what came in today --------------------------------------------------------------------------------------
-    today = date.today()
-    new_today = df[(df["Added On"] == today) & (df["Duplicate Flag"] != "Possible Duplicate")]
-    if len(new_today):
-        shown = new_today.sort_values("Message Date", ascending=False).head(8)
-        chips = "".join(f"<span class='chip-new'><b>{html.escape(r['CSP'])}</b> · {html.escape(r['Problem'])}</span>"
-                        for _, r in shown.iterrows())
-        more = len(new_today) - len(shown)
-        more_html = f"<span class='chip-more'>+{more} aur</span>" if more > 0 else ""
-        st.markdown(f"<div class='today'><div class='today-h'>🆕 Aaj report mein {len(new_today)} nayi complaint judi</div>"
-                    f"<div>{chips}{more_html}</div></div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='today quiet'><div class='today-h'>✅ Aaj abhi tak koi nayi complaint nahi aayi</div>"
-                    "<div class='small-note'>Report roz 10:00 AM aur 3:00 PM pe apne aap update hoti hai.</div></div>",
-                    unsafe_allow_html=True)
-
     with st.container(border=True):
-        box_title("✅ Aaj kya karna hai", "Har complaint ko ek priority mili hai – upar wali pehle karo")
-        st.markdown("<div class='prio-strip'>" + "".join(
-            f"<div class='prio p{i}'><div class='h'>{name}</div>"
-            f"<div class='c'>{int(counts.get(name, 0))}</div><div class='d'>{html.escape(desc)}</div></div>"
-            for i, (name, desc, _color) in enumerate(PRIORITIES)) + "</div>", unsafe_allow_html=True)
-        todo = f[f["Priority"] != "🟢 Solved"].head(10)
-        if len(todo):
+        box_title(f"⏳ Pending complaints – {len(pending)}", "Sabse zaroori upar · poori detail 📋 Complaints tab mein")
+        if len(pending):
             color_of = {name: color for name, _, color in PRIORITIES}
             cards_html = []
-            for _, r in todo.iterrows():
+            for _, r in pending.iterrows():
                 days = "" if pd.isna(r["Days Pending"]) else f"{int(r['Days Pending'])} din se pending"
                 cards_html.append(
                     f"<div class='cc' style='--c:{color_of.get(r['Priority'], PRIMARY)}'>"
@@ -665,36 +613,8 @@ with tab_home:
                     f"<div><span class='days'>{html.escape(r['Priority'])}{' · ' + days if days else ''}</span>"
                     f"<div class='act'>{html.escape(r['Suggested Action'])}</div></div></div>")
             st.markdown("".join(cards_html), unsafe_allow_html=True)
-            st.caption(f"Top 10 of {int((f['Priority'] != '🟢 Solved').sum())} open complaints – full list in the 📋 Complaints tab.")
         else:
             st.success("Kuch pending nahi hai. 🎉")
-
-    c1, c2 = st.columns(2, gap="medium")
-    with c1, st.container(border=True):
-        box_title("📍 Kya problem aa rahi hai?", "Complaints per problem type")
-        drill(f, f["Problem"], "blue")
-    with c2, st.container(border=True):
-        box_title("👤 Kisne report kiya?", "Complaints sent by each DC / person")
-        drill(f, f["Reported By"], "green")
-
-    c3, c4, c5 = st.columns(3, gap="medium")
-    with c3, st.container(border=True):
-        box_title("🔁 Baar-baar wale CSP", "Same CSP reported 2+ times")
-        repeat = known_csp.value_counts()
-        repeat = repeat[repeat >= 2].rename_axis("CSP").reset_index(name="Complaints")
-        rep = f[f["CSP"].isin(repeat["CSP"])]
-        drill(rep, rep["CSP"], "orange", limit=8)
-    with c4, st.container(border=True):
-        box_title("🗺 District", "Only where it was written")
-        a = f.loc[f["Area"] != NOT_MENTIONED, "Area"].value_counts().rename_axis("Area").reset_index(name="Complaints").head(8)
-        known_area = f[f["Area"] != NOT_MENTIONED]
-        drill(known_area, known_area["Area"], "blue", limit=8)
-        st.caption(f"{int((f['Area'] == NOT_MENTIONED).sum())} complaint(s) did not mention a district.")
-    with c5, st.container(border=True):
-        box_title("📏 CSP se kitna door", "Distance shown in the app")
-        far = f[f["Distance Mismatch (metres)"].notna()].sort_values("Distance Mismatch (metres)", ascending=False).head(8)
-        far_keys = far["CSP"] + " (" + far["Message Date"].map(lambda d: f"{d:%d %b}") + ")"
-        drill(far, far_keys, "red", limit=8, value=far["Distance Mismatch (metres)"], unit=" m")
 
 # --- Complaints ------------------------------------------------------------------------------------------------
 with tab_list:
