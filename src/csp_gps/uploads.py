@@ -36,6 +36,7 @@ class UploadResult:
     name: str
     ok: bool          # saved as a new file
     message: str      # short Hinglish line for the dashboard
+    known: bool = False   # valid file that is already in input/ (still worth a report rebuild)
 
 
 def uploads_enabled(env: dict) -> bool:
@@ -109,7 +110,8 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
     sha = _sha(data)
     for existing in dest_dir.iterdir():
         if existing.is_file() and existing.suffix.lower() == suffix and _sha(existing.read_bytes()) == sha:
-            return UploadResult(safe, False, f"Yeh file pehle se hai ({existing.name}), dobara nahi joda.")
+            return UploadResult(safe, False, f"Yeh file pehle se hai ({existing.name}), report usse dobara banegi.",
+                                known=True)
     dest = dest_dir / safe
     if dest.exists():
         dest = dest_dir / f"{Path(safe).stem}__{sha[:8]}{suffix}"

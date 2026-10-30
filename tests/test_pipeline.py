@@ -302,7 +302,8 @@ def test_upload_box_saves_checks_and_skips_repeats(tmp_path):
     export = buf.getvalue()
     first = save_upload("Kiosk Team Eko.zip", export, tmp_path)
     assert first.ok and (tmp_path / "Kiosk Team Eko.zip").exists()
-    assert not save_upload("copy.zip", export, tmp_path).ok                 # same content -> skipped
+    dup = save_upload("copy.zip", export, tmp_path)
+    assert not dup.ok and dup.known                                       # same content -> skipped, still rebuilds
     assert not save_upload("photo.zip", b"not a zip", tmp_path).ok          # not an export
     assert not save_upload("../../evil.exe", b"x", tmp_path).ok             # wrong type
     assert save_upload("../x/../Kiosk Team Eko.zip", export + b"", tmp_path).ok is False

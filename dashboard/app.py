@@ -29,7 +29,7 @@ sys.path.insert(0, str(PROJECT / "src"))
 from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared with the Excel Daily Update sheet)
 from csp_gps.locations import load_locations as read_locations  # noqa: E402
 from csp_gps.locations import merge_locations  # noqa: E402
-from csp_gps.uploads import log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
+from csp_gps.uploads import UploadResult, log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
 from csp_gps.visits import LOW_SCORE  # noqa: E402
 
 try:  # DASHBOARD_PASSWORD etc. live in .env on the server
@@ -553,6 +553,13 @@ def sign_out_bar() -> None:
 UPLOADS_ON = uploads_enabled(os.environ)
 
 
+def _rebuild() -> tuple[bool, str]:
+    with st.spinner("Report ban rahi hai… (1–2 minute)"):
+        ok, tail = run_report(PROJECT)
+    log_upload(PROJECT / "logs", [UploadResult("(rebuild)", ok, "report rebuilt" if ok else "report failed")])
+    return ok, tail
+
+
 def upload_box() -> None:
     """Sidebar box to add a WhatsApp export or SBI visit report and rebuild the report (CSP_UPLOADS=1)."""
     if not UPLOADS_ON:
@@ -565,15 +572,21 @@ def upload_box() -> None:
         if st.button("Upload & update", key="upload_btn", width="stretch", disabled=not files, type="primary"):
             results = [save_upload(f.name, f.getvalue(), PROJECT / "input") for f in files]
             log_upload(PROJECT / "logs", results)
-            ok, tail = (False, "")
-            if any(r.ok for r in results):
-                with st.spinner("Report ban rahi hai… (1–2 minute)"):
-                    ok, tail = run_report(PROJECT)
-            st.session_state["upload_msgs"] = ([(r.ok, f"{r.name}: {r.message}") for r in results]
-                                               + ([(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")]
-                                                  if any(r.ok for r in results) else []))
+            # rebuild for new files AND for files already there (an earlier upload may have saved them
+            # without a successful report run)
+            rebuild = any(r.ok or r.known for r in results)
+            ok, tail = _rebuild() if rebuild else (False, "")
+            st.session_state["upload_msgs"] = (
+                [(r.ok or r.known, f"{r.name}: {r.message}") for r in results]
+                + ([(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")] if rebuild else []))
             st.session_state["upload_tail"] = "" if ok else tail
             st.session_state["up_round"] = st.session_state.get("up_round", 0) + 1  # clears the picker
+            st.rerun()
+        if st.button("🔄 Report dobara banao", key="rebuild_btn", width="stretch",
+                     help="Jo bhi files server par hain, unse report fir se banao"):
+            ok, tail = _rebuild()
+            st.session_state["upload_msgs"] = [(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")]
+            st.session_state["upload_tail"] = "" if ok else tail
             st.rerun()
         for good, msg in st.session_state.get("upload_msgs", []):
             (st.success if good else st.warning)(msg)

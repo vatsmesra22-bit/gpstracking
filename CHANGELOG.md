@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.2 – 2026-10-30
+
+### Fixed
+- Uploading a file that is already on the server now still rebuilds the report. Before, a file saved by an earlier upload whose report run had failed stayed out of the numbers.
+- Added a **🔄 Report dobara banao** button in the upload box.
+
 ## 1.12.1 – 2026-10-29
 
 ### Changed
