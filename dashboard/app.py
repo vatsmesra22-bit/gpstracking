@@ -440,8 +440,9 @@ def show_list(title: str, frame: pd.DataFrame, kind: str = "complaints") -> None
 
 
 def drill(frame: pd.DataFrame, keys: pd.Series, color: str = "blue", view: str = "complaints", limit: int = 10,
-          order: list | None = None, value: pd.Series | None = None, unit: str = "") -> None:
-    """Ranked list where every row is an expander: click it to see exactly which records are counted."""
+          order: list | None = None, value: pd.Series | None = None, unit: str = "", key: str = "drill") -> None:
+    """Ranked list where every row is an expander: click it to see exactly which records are counted. In a visits
+    list, click a row inside to open that CSP's full history (all its app visits and complaints)."""
     keys = keys.astype(str)
     counts = keys.value_counts() if value is None else value.groupby(keys).max().sort_values(ascending=False)
     if order is not None:
@@ -450,22 +451,50 @@ def drill(frame: pd.DataFrame, keys: pd.Series, color: str = "blue", view: str =
     if counts.empty:
         st.markdown("<div class='small-note'>Kuch nahi hai.</div>", unsafe_allow_html=True)
         return
-    total = counts.sum()
     for i, (name, n) in enumerate(counts.head(limit).items(), start=1):
         badge = "gray" if name == NOT_MENTIONED else color
-        pct = f" &nbsp;·&nbsp; {n / total:.0%}" if value is None else ""
-        with st.expander(f"{i}. &nbsp; **{name}** &nbsp; :{badge}-badge[{n:,.0f}{unit}]{pct}"):
+        with st.expander(f"{i}. &nbsp; **{name}** &nbsp; :{badge}-badge[{n:,.0f}{unit}]"):
             sub = frame[keys == name]
             v = VIEWS[view](sub)
             if view == "complaints":  # short table inside a list row; full detail stays in the popup / Complaints tab
                 v = v[["Priority", "No.", "Date", "CSP", "Problem", "Reported by", "Days", "App visit"]]
-            st.dataframe(v, hide_index=True, width="stretch", height=min(360, 40 + 35 * len(v)),
-                         column_config={"Date": DATE_COL, "First": DATE_COL, "Latest": DATE_COL,
-                                        "Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
-                                        "Days": st.column_config.NumberColumn(format="%d d"),
-                                        "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d")})
+            if view == "visits":
+                st.caption(f"{len(sub)} visit · {sub['CSP Code'].nunique()} CSP · avg score "
+                           f"{sub['Visit Score'].mean():.0f} · score < {LOW_SCORE}: {int((sub['Visit Score'] < LOW_SCORE).sum())}"
+                           " · 👇 CSP pe click karo, uski poori history khulegi")
+            picked = st.dataframe(v, hide_index=True, width="stretch", height=min(360, 40 + 35 * len(v)),
+                                  key=f"{key}_{i}", on_select="rerun" if view == "visits" else "ignore",
+                                  selection_mode="single-row",
+                                  column_config={"Date": DATE_COL, "First": DATE_COL, "Latest": DATE_COL,
+                                                 "Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
+                                                 "Days": st.column_config.NumberColumn(format="%d d"),
+                                                 "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
+                                                                                                format="%d")})
+            if view == "visits" and picked.selection.rows:
+                csp_history(str(v.iloc[picked.selection.rows[0]]["CSP Code"]))
     if len(counts) > limit:
         st.caption(f"+ {len(counts) - limit} more – use the filters on the left to see them")
+
+
+@st.dialog("📍 CSP ki poori history", width="large")
+def csp_history(code: str) -> None:
+    st.markdown(f"<div class='box-title' style='font-size:1.25rem'>CSP {html.escape(code)}</div>", unsafe_allow_html=True)
+    cv = visits[(visits["CSP Code"] == code) & (visits["Duplicate Row"] == "No")].sort_values("Visit Date")
+    box_title("🗓 App visits", f"{len(cv)} visit (score 0 bhi)")
+    if cv.empty:
+        st.info("Is CSP ki koi app visit nahi hai.")
+    else:
+        st.dataframe(visit_view(cv), hide_index=True, width="stretch",
+                     column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
+                                    "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
+                                                                                   format="%d")})
+    cc = df[(df["CSP"] == code) & (df["Duplicate Flag"] != "Possible Duplicate")]
+    box_title("📋 WhatsApp complaints", f"{len(cc)} complaint")
+    if cc.empty:
+        st.info("Is CSP ki koi complaint nahi aayi.")
+    else:
+        st.dataframe(complaint_view(cc)[["No.", "Date", "Problem", "Reported by", "Status", "App visit", "Message"]],
+                     hide_index=True, width="stretch", column_config={"Date": DATE_COL})
 
 
 def card_row(items: list[tuple]) -> None:
@@ -759,6 +788,7 @@ with tab_visits:
             u = u[(u["Visit Date"] >= vdates[0]) & (u["Visit Date"] <= vdates[1])]
             zero = zero[(zero["Visit Date"] >= vdates[0]) & (zero["Visit Date"] <= vdates[1])]
         # each CSP once (its latest completed visit); score 0 only for CSPs with no completed visit at all
+        u_all = u  # every completed visit once: a DC's own work (a CSP visited by two DCs counts for both)
         u = u.sort_values("Visit Date").drop_duplicates("CSP Code", keep="last")
         zero = (zero[~zero["CSP Code"].isin(set(once.loc[once["Visit Done"] != "No", "CSP Code"]))]
                 .sort_values("Visit Date").drop_duplicates("CSP Code", keep="last"))
@@ -797,7 +827,7 @@ with tab_visits:
             order = [f"{d:%a, %d %b %Y}" for d in sorted(set(u["Visit Date"]), reverse=True)]
             st.markdown("<div class='small-note' style='margin-top:6px'>👇 Din ke visits dekhne ke liye tarikh pe click karo</div>",
                         unsafe_allow_html=True)
-            drill(u, day_keys, "blue", view="visits", order=order, limit=len(order))
+            drill(u, day_keys, "blue", view="visits", order=order, limit=len(order), key="vday")
 
         with st.container(border=True):
             box_title("🔗 Complaint wale CSPs – kya baad mein app se visit hua?",
@@ -823,15 +853,16 @@ with tab_visits:
         c1, c2, c3 = st.columns(3, gap="medium")
         with c1, st.container(border=True):
             box_title("🏢 Circle-wise visits", "SBI circle of the CSP")
-            drill(u, u["Circle"], "blue", view="visits")
+            drill(u, u["Circle"], "blue", view="visits", key="vcircle")
         with c2, st.container(border=True):
-            box_title("👤 DC-wise visits", "App username (names: config/dc_users.csv)")
-            drill(u, u["DC Name"].where(u["DC Name"] != NA, u["DC User"]), "orange", view="visits")
+            box_title("👤 DC-wise visits", "Har DC ki apni poori visits (score > 0) · naam: config/dc_users.csv")
+            dc_label = u_all["DC User"] + u_all["DC Name"].map(lambda n: f" · {n}" if n != NA else " · naam nahi mila")
+            drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
         with c3, st.container(border=True):
             box_title("⭐ Visit score", "Visits in each score band")
             bands = pd.cut(u["Visit Score"], [-1, 49, LOW_SCORE - 1, 89, 100],
                            labels=["0–49", f"50–{LOW_SCORE - 1}", f"{LOW_SCORE}–89", "90–100"])
-            drill(u, bands.astype(str), "green", view="visits",
+            drill(u, bands.astype(str), "green", view="visits", key="vband",
                   order=["90–100", f"{LOW_SCORE}–89", f"50–{LOW_SCORE - 1}", "0–49"])
             if len(low):
                 st.caption(f"Low-score visits (<{LOW_SCORE}): " + ", ".join(sorted(low["CSP Code"].astype(str))[:12])

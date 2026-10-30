@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.3 – 2026-10-30
+
+### Changed
+- App Visits lists (date, circle, DC, score band) no longer show percentages.
+- DC-wise visits counts each DC's own completed visits, so a CSP visited by two DCs counts for both. The label shows the username plus the name from `config/dc_users.csv`, or "naam nahi mila" when the name is missing.
+- Inside any visits list, clicking a CSP row opens that CSP's full history: all its app visits (score 0 too) and its WhatsApp complaints.
+
 ## 1.12.2 – 2026-10-30
 
 ### Fixed
