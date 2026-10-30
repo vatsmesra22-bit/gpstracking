@@ -832,21 +832,33 @@ with tab_visits:
             st.caption(f"The report had {dup_rows} repeated row(s); each visit is counted once.")
 
         with st.container(border=True):
-            box_title("📅 Date-wise app visits", "Newest date first · click a date to see that day's visits")
+            box_title("📅 Date-wise app visits", "Left: har din ka total · tarikh pe click karo, right mein us din ki visits")
             daily = (u.groupby("Visit Date")
-                     .agg(Visits=("CSP Code", "count"), CSPs=("CSP Code", "nunique"), DCs=("DC User", "nunique"),
+                     .agg(Visits=("CSP Code", "count"), DCs=("DC User", "nunique"),
                           Avg_score=("Visit Score", "mean"), Low=("Visit Score", lambda x: int((x < LOW_SCORE).sum())))
                      .sort_index(ascending=False).reset_index())
-            daily.insert(1, "Day", daily["Visit Date"].map(lambda d: f"{d:%A}"))
-            st.dataframe(daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score", "Low": f"Score < {LOW_SCORE}"}),
-                         hide_index=True, width="stretch", height=min(420, 40 + 35 * len(daily)),
-                         column_config={"Date": st.column_config.DateColumn(format="DD MMM YYYY"),
-                                        "Avg score": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%.0f")})
-            day_keys = u["Visit Date"].map(lambda d: f"{d:%a, %d %b %Y}")
-            order = [f"{d:%a, %d %b %Y}" for d in sorted(set(u["Visit Date"]), reverse=True)]
-            st.markdown("<div class='small-note' style='margin-top:6px'>👇 Din ke visits dekhne ke liye tarikh pe click karo</div>",
-                        unsafe_allow_html=True)
-            drill(u, day_keys, "blue", view="visits", order=order, limit=len(order), key="vday")
+            dl, dr = st.columns([5, 7], gap="medium")
+            with dl:
+                day_pick = st.dataframe(
+                    daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score", "Low": f"< {LOW_SCORE}"}),
+                    hide_index=True, width="stretch", height=420, key="vday_table", on_select="rerun",
+                    selection_mode="single-row",
+                    column_config={"Date": st.column_config.DateColumn(format="ddd, DD MMM"),
+                                   "Avg score": st.column_config.NumberColumn(format="%.0f")})
+            rows = day_pick.selection.rows
+            day = daily.iloc[rows[0] if rows else 0]["Visit Date"]
+            with dr:
+                dv = u[u["Visit Date"] == day]
+                st.markdown(f"<div class='box-title' style='font-size:1rem'>{day:%A, %d %b %Y} · {len(dv)} visit</div>"
+                            "<div class='small-note'>👇 CSP pe click karo, uski poori history khulegi</div>",
+                            unsafe_allow_html=True)
+                vv = visit_view(dv)[["CSP Code", "Circle", "DC User", "DC Name", "Visit Score"]]
+                csp_pick = st.dataframe(vv, hide_index=True, width="stretch", height=380, key="vday_visits",
+                                        on_select="rerun", selection_mode="single-row",
+                                        column_config={"Visit Score": st.column_config.ProgressColumn(
+                                            min_value=0, max_value=100, format="%d")})
+                if csp_pick.selection.rows:
+                    csp_history(str(vv.iloc[csp_pick.selection.rows[0]]["CSP Code"]))
 
         with st.container(border=True):
             box_title("🔗 Complaint wale CSPs – kya baad mein app se visit hua?",

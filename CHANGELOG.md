@@ -6,6 +6,7 @@
 - App Visits lists (date, circle, DC, score band) no longer show percentages.
 - DC-wise visits counts each DC's own completed visits, so a CSP visited by two DCs counts for both. The label shows the username plus the name from `config/dc_users.csv`, or "naam nahi mila" when the name is missing.
 - Cleaner look: an open list row gets a soft background, tables have rounded borders, box titles have a saffron bar, the upload box has a dashed drop area (the wrong "200MB per file" hint is hidden) and the main buttons are solid Eko blue.
+- Date-wise app visits is one box: a day table on the left and, on the right, the visits of the day you click (newest day by default). The long list of date rows is gone.
 - Inside any visits list, clicking a CSP row opens that CSP's full history: all its app visits (score 0 too) and its WhatsApp complaints.
 
 ## 1.12.2 – 2026-10-30
