@@ -259,6 +259,25 @@ st.markdown(f"""
   .row {{display:flex; gap:12px; padding:7px 0; border-bottom:1px solid #F0ECE6;}}
   .row .k {{width:120px; color:{MUTED}; font-size:0.9rem;}} .row .v {{font-size:0.95rem; color:{INK};}}
 
+  /* clean, quiet polish: ranked rows, upload box, buttons, tables */
+  div[data-testid="stExpander"] summary {{border-radius:10px; transition:background .15s ease;}}
+  div[data-testid="stExpander"] summary p {{font-size:0.97rem !important;}}
+  div[data-testid="stExpander"] details[open] {{background:#FBF8F3 !important; border-radius:12px !important;
+      border-bottom-color:transparent !important; margin:4px 0;}}
+  div[data-testid="stExpander"] details[open] > summary {{border-bottom:1px solid #EFE9E1;}}
+  [data-testid="stDataFrame"] {{border:1px solid #EFE9E1; border-radius:12px; overflow:hidden;}}
+  .box-title {{padding-left:10px; border-left:4px solid #E69B1A; line-height:1.3;}}
+  .box-sub {{padding-left:14px;}}
+  .st-key-upload_box {{background:#fff;}}
+  .st-key-upload_box [data-testid="stFileUploaderDropzone"] {{background:#F0F7FA; border:1.5px dashed #7FB8CF;
+      border-radius:12px;}}
+  .st-key-upload_box [data-testid="stFileUploaderDropzoneInstructions"] small {{display:none;}}
+  .stApp button[kind="primary"] {{background:{HEADER_BG} !important; border:none !important; border-radius:10px !important;
+      font-weight:700 !important;}}
+  .stApp button[kind="primary"]:hover {{background:#00557A !important;}}
+  .stApp button[kind="primary"]:disabled {{background:#C9D9E1 !important;}}
+  section[data-testid="stSidebar"] h3 {{font-size:1.05rem !important; color:{INK};}}
+
 </style>""", unsafe_allow_html=True)
 
 
