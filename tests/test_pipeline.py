@@ -333,6 +333,25 @@ def test_each_csp_counted_once_in_visit_totals(tmp_path):
     assert list(score_zero_csps(v)["CSP Code"]) == ["1A000002"]            # 1A000003 later completed
 
 
+def test_visits_counted_month_by_month(tmp_path):
+    from csp_gps.visits import load_visit_reports, monthly_summary
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({
+        "CSP Code": ["1A000001", "1A000001", "1A000002", "1A000003", "1A000003", "1A000004"],
+        "Visit Date": ["2026-10-08", "2026-11-03", "2026-10-09", "2026-10-10", "2026-11-02", "2026-11-04"],
+        "Visit Score": [80, 90, 0, 95, 0, 70],
+        "username": ["BC1", "BC1", "BC2", "BC3", "BC3", "BC1"],
+    }).to_excel(folder / "Visit report.xlsx", index=False)
+    v, _ = load_visit_reports(folder, tmp_path)
+    m = monthly_summary(v).set_index("Month")
+    assert list(m.index) == ["2026-11", "2026-10"]                         # newest month first
+    assert m.loc["2026-10", "Visits"] == 2 and m.loc["2026-10", "Score 0"] == 1
+    assert m.loc["2026-11", "Visits"] == 2 and m.loc["2026-11", "Score 0"] == 1   # 1A000003 done in Oct, not Nov
+    assert m.loc["2026-11", "DCs"] == 1 and m.loc["2026-11", "Avg Score"] == 80 and m.loc["2026-11", "Low Score"] == 1
+
+
 # --- CSP location list ------------------------------------------------------------------------------------
 def test_csp_locations_load_mask_and_merge(tmp_path):
     from csp_gps.locations import load_locations, merge_locations

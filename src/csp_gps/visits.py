@@ -123,6 +123,30 @@ def score_zero_csps(visits: pd.DataFrame) -> pd.DataFrame:
     return z.sort_values("Visit Date").drop_duplicates("CSP Code", keep="last")
 
 
+def visit_month(visits: pd.DataFrame) -> pd.Series:
+    """'YYYY-MM' of each visit, used to show and compare the App Visits tab one month at a time."""
+    return pd.to_datetime(visits["Visit Date"]).dt.strftime("%Y-%m")
+
+
+def monthly_summary(visits: pd.DataFrame) -> pd.DataFrame:
+    """One row per month, newest first, counted like the App Visits cards: each CSP once per month (its latest
+    completed visit); score 0 only for CSPs with no completed visit that month."""
+    cols = ["Month", "From", "To", "Visits", "Score 0", "DCs", "Avg Score", "Low Score"]
+    if visits.empty:
+        return pd.DataFrame(columns=cols)
+    rows = []
+    for month, part in visits.groupby(visit_month(visits)):
+        done, zero = done_csps(part), score_zero_csps(part)
+        dates = part.loc[part["Duplicate Row"] == "No", "Visit Date"]
+        if dates.empty:
+            continue
+        rows.append([month, min(dates), max(dates), len(done), len(zero),
+                     done["DC User"].nunique() if len(done) else 0,
+                     round(done["Visit Score"].mean()) if len(done) else None,
+                     int((done["Visit Score"] < LOW_SCORE).sum()) if len(done) else 0])
+    return pd.DataFrame(rows, columns=cols).sort_values("Month", ascending=False).reset_index(drop=True)
+
+
 def link_visits(issues: pd.DataFrame, visits: pd.DataFrame) -> pd.DataFrame:
     """For each complaint, the first app visit recorded for the same CSP on or after the complaint date."""
     out = issues.copy()

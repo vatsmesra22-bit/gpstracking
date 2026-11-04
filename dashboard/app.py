@@ -30,7 +30,7 @@ from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared wi
 from csp_gps.locations import load_locations as read_locations  # noqa: E402
 from csp_gps.locations import merge_locations  # noqa: E402
 from csp_gps.uploads import UploadResult, log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
-from csp_gps.visits import LOW_SCORE  # noqa: E402
+from csp_gps.visits import LOW_SCORE, monthly_summary, visit_month  # noqa: E402
 
 try:  # DASHBOARD_PASSWORD etc. live in .env on the server
     from dotenv import load_dotenv
@@ -792,16 +792,23 @@ with tab_visits:
                 "daal ke 'Update Report.bat' chalaiye.")
     else:
         once = visits[visits["Duplicate Row"] == "No"]
+        months = monthly_summary(visits)
+        month_name = {m: pd.Period(m).strftime("%B %Y") for m in months["Month"]}
+        month = st.pills("Mahina", list(months["Month"]), default=months["Month"].iloc[0], key="visit_month",
+                         format_func=lambda m: f"📅 {month_name[m]}", help="Ek mahina chuno, neeche sab usi mahine ka dikhega")
+        month = month or months["Month"].iloc[0]
+        once = once[visit_month(once) == month]
         u, zero = once[once["Visit Done"] != "No"], once[once["Visit Done"] == "No"]  # score 0 = not completed
-        vmin, vmax = min(u["Visit Date"]), max(u["Visit Date"])
+        vmin, vmax = min(once["Visit Date"]), max(once["Visit Date"])
         files = sorted({Path(x).name for x in visits["Source File"]})
         st.markdown(
-            f"<div class='today quiet'><div class='today-h'>📅 SBI CSP Visit App report: {vmin:%d %b} – {vmax:%d %b %Y}</div>"
+            f"<div class='today quiet'><div class='today-h'>📅 {month_name[month]} · SBI CSP Visit App report: "
+            f"{vmin:%d %b} – {vmax:%d %b %Y}</div>"
             f"<div class='small-note'>Latest visit date in the report: <b>{vmax:%A, %d %b %Y}</b> · "
             f"{len(files)} report file(s): {html.escape(', '.join(files))} · har CSP ek hi baar gina gaya "
             f"(2 din visit hui toh bhi 1) · score 0 = visit poori nahi hui, alag dikhaya</div></div>",
             unsafe_allow_html=True)
-        vdates = st.date_input("Visit date", (vmin, vmax), min_value=vmin, max_value=vmax, key="visit_dates",
+        vdates = st.date_input("Visit date", (vmin, vmax), min_value=vmin, max_value=vmax, key=f"visit_dates_{month}",
                                help="Show only visits made between these dates")
         if isinstance(vdates, (list, tuple)) and len(vdates) == 2:
             u = u[(u["Visit Date"] >= vdates[0]) & (u["Visit Date"] <= vdates[1])]
@@ -830,6 +837,36 @@ with tab_visits:
         ])
         if dup_rows:
             st.caption(f"The report had {dup_rows} repeated row(s); each visit is counted once.")
+
+        with st.container(border=True):
+            box_title("📅 Har mahine ki visits", "Upar naya mahina, neeche purane · upar se mahina chuno toh uski "
+                      "poori details dikhegi")
+            prev = months.shift(-1)  # the month before each row
+
+            def change(now, before, word: str) -> str:
+                if pd.isna(before) or pd.isna(now) or now == before:
+                    return "" if pd.isna(before) else f"= {word} same"
+                return f"{'▲' if now > before else '▼'} {abs(now - before):.0f} {word} {'zyada' if now > before else 'kam'}"
+
+            st.dataframe(pd.DataFrame({
+                "Mahina": months["Month"].map(month_name),
+                "Kab se kab tak": [f"{a:%d %b} – {b:%d %b}" for a, b in zip(months["From"], months["To"], strict=True)],
+                "Visits hui": months["Visits"],
+                "Poori nahi hui (score 0)": months["Score 0"],
+                "Kitne DC ne ki": months["DCs"],
+                "Average score": months["Avg Score"],
+                f"{LOW_SCORE} se kam score": months["Low Score"],
+                "Pichhle mahine se": [
+                    " · ".join(x for x in (change(a, b, "visit"), change(c, d, "score")) if x) or "—"
+                    for a, b, c, d in zip(months["Visits"], prev["Visits"], months["Avg Score"], prev["Avg Score"],
+                                          strict=True)],
+            }), hide_index=True, width="stretch")
+            if len(months) == 1:
+                st.caption("Abhi ek hi mahine ka data hai. Agle mahine ki visit report aate hi woh upar aa jaayega "
+                           "aur yeh mahina neeche chala jaayega.")
+            elif months["To"].iloc[0].day < 28:
+                st.caption(f"{month_name[months['Month'].iloc[0]]} abhi chal raha hai ({months['To'].iloc[0]:%d %b} tak "
+                           "ka data), isliye pichhle poore mahine se kam dikhega.")
 
         with st.container(border=True):
             box_title("📅 Date-wise app visits", "Left: har din ka total · tarikh pe click karo, right mein us din ki visits")

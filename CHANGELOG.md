@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.13.0 – 2026-11-04
+
+### Added
+- App Visits is month-wise. A month picker at the top (newest month first) shows the cards, date-wise box and lists for that month only.
+- New **📅 Har mahine ki visits** box: one row per month (newest on top, older months below) with visits, score 0, DCs, average score, low-score count and a plain "Pichhle mahine se" line (▲/▼ zyada/kam). There are no graphs. A running month is marked as partial.
+- `visits.monthly_summary()` counts each CSP once per month, the same way as the cards, and has a test.
+
+## 1.12.4 – 2026-10-30
+
+### Changed
+- `config/csp_locations.csv` now has 42 CSPs: the 27 from 23–24 Oct plus 15 TBA-list CSPs (Himachal Pradesh) whose lat/long came from the RM's coordinates file. As before, it holds CSP code and lat/long only. CSPs whose RM value is wrong or far from other sources are left out until confirmed.
+
 ## 1.12.3 – 2026-10-30
 
 ### Changed
