@@ -794,7 +794,9 @@ with tab_visits:
         once = visits[visits["Duplicate Row"] == "No"]
         months = monthly_summary(visits)
         month_name = {m: pd.Period(m).strftime("%B %Y") for m in months["Month"]}
-        month = st.pills("Mahina", list(months["Month"]), default=months["Month"].iloc[0], key="visit_month",
+        # the key carries the newest month, so when a new month's report arrives the page jumps to it
+        month = st.pills("Mahina", list(months["Month"]), default=months["Month"].iloc[0],
+                         key=f"visit_month_{months['Month'].iloc[0]}",
                          format_func=lambda m: f"📅 {month_name[m]}", help="Ek mahina chuno, neeche sab usi mahine ka dikhega")
         month = month or months["Month"].iloc[0]
         once = once[visit_month(once) == month]
