@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.13.1 – 2026-11-05
+
+### Fixed
+- A visit report row without a valid Visit Date (for example a blank or "Total" row) crashed the report rebuild with "Cannot compare NaT with datetime.date", so new uploads (the November report) never showed. These rows are now skipped and listed under failed files.
+
 ## 1.13.0 – 2026-11-04
 
 ### Added

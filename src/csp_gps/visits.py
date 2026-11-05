@@ -79,6 +79,13 @@ def load_visit_reports(folder: Path, project_dir: Path, users_csv: Path | None =
     v["DC User"] = v["DC User"].fillna(NOT_AVAILABLE).astype(str).str.strip()
     v["DC Name"] = v["DC User"].map(users).fillna("").replace("", NOT_AVAILABLE)
     v["Visit Date"] = pd.to_datetime(v["Visit Date"], errors="coerce").dt.date
+    no_date = v["Visit Date"].isna()  # e.g. a blank or "Total" row at the bottom of the SBI sheet
+    for rel, n in v.loc[no_date, "Source File"].value_counts().items():
+        log.warning("Visit report %s: %d row(s) without a valid Visit Date skipped", rel, n)
+        failed.append({"file": rel, "error": f"{n} row(s) without a valid Visit Date skipped"})
+    v = v[~no_date]
+    if v.empty:
+        return pd.DataFrame(columns=VISIT_COLUMNS), failed
     v["Visit Score"] = pd.to_numeric(v["Visit Score"], errors="coerce")
     for col in ("Compliance Completed", "Closures Completed"):
         v[col] = v[col].fillna(NOT_AVAILABLE).astype(str).str.strip().str.upper()

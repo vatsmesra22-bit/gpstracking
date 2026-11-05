@@ -352,6 +352,18 @@ def test_visits_counted_month_by_month(tmp_path):
     assert m.loc["2026-11", "DCs"] == 1 and m.loc["2026-11", "Avg Score"] == 80 and m.loc["2026-11", "Low Score"] == 1
 
 
+def test_visit_rows_without_a_date_are_skipped(tmp_path):
+    from csp_gps.visits import load_visit_reports
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({"CSP Code": ["1A000001", "Total", "1A000002"], "Visit Date": ["2026-11-02", None, "not a date"],
+                  "Visit Score": [90, 90, 80]}).to_excel(folder / "Visit report Nov.xlsx", index=False)
+    v, failed = load_visit_reports(folder, tmp_path)
+    assert list(v["CSP Code"]) == ["1A000001"]
+    assert failed and "2 row(s) without a valid Visit Date" in failed[0]["error"]
+
+
 # --- CSP location list ------------------------------------------------------------------------------------
 def test_csp_locations_load_mask_and_merge(tmp_path):
     from csp_gps.locations import load_locations, merge_locations
