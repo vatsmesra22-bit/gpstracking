@@ -278,8 +278,13 @@ st.markdown(f"""
   .stApp button[kind="primary"]:hover {{background:#00557A !important;}}
   .stApp button[kind="primary"]:disabled {{background:#C9D9E1 !important;}}
   section[data-testid="stSidebar"] h3 {{font-size:1.05rem !important; color:{INK};}}
-  /* the upload box lives in the sidebar: no "<<" button to close it (the open button stays for small screens) */
+  /* the upload box lives in the sidebar: keep it always open, even if the browser remembers it closed */
   [data-testid="stSidebarCollapseButton"] {{display:none !important;}}
+  [data-testid="stExpandSidebarButton"] {{visibility:visible !important;}}
+  @media (min-width: 768px) {{
+    section[data-testid="stSidebar"] {{transform:none !important; visibility:visible !important;
+        min-width:300px !important; width:300px !important; margin-left:0 !important; position:relative !important;}}
+  }}
 
 </style>""", unsafe_allow_html=True)
 
