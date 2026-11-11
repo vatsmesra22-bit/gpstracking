@@ -64,7 +64,7 @@ def main() -> int:
             new = import_new_exports(settings.watch_folder, settings.import_patterns, settings.input_dir)
             log.info("Auto-import: %d new export(s)%s", len(new), f": {', '.join(new)}" if new else "")
             reports = import_new_exports(settings.watch_folder, settings.visit_report_patterns,
-                                         settings.input_dir / "visit_reports", suffixes=(".xlsx", ".csv"))
+                                         settings.input_dir / "visit_reports", suffixes=(".xlsx", ".xls", ".csv"))
             log.info("Auto-import: %d new visit report(s)%s", len(reports), f": {', '.join(reports)}" if reports else "")
         else:
             log.warning("Auto-import requested but no watch folder is configured")

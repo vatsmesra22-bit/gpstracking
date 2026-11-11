@@ -382,3 +382,14 @@ def test_csp_locations_load_mask_and_merge(tmp_path):
     m = merge_locations(loc, issues, done).set_index("CSP Code")
     assert m.loc["1A852327", "Pending Complaints"] == 1 and m.loc["1A852327", "Last App Visit"] == "2026-10-24"
     assert m.loc["1A852327", "Map"].startswith("https://maps.google.com/?q=28.9486537")
+
+
+def test_upload_accepts_xls_visit_report(tmp_path):
+    from csp_gps.uploads import REPORT_SUFFIXES, save_upload
+
+    assert ".xls" in REPORT_SUFFIXES
+    sbi = Path(__file__).resolve().parents[2] / "Additional_CSP_Detailed_Report_1A8518_04102026 (2).xls"
+    if not sbi.exists():
+        pytest.skip("no sample .xls on this PC")
+    r = save_upload("Visit report.xls", b"not really excel", tmp_path)
+    assert not r.ok and "visit report" in r.message.lower()

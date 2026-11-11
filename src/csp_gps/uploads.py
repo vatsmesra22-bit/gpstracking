@@ -1,6 +1,6 @@
 """Files added from the dashboard's upload box (on when CSP_UPLOADS=1).
 
-A WhatsApp export (.zip / .txt) goes to input/, an SBI CSP Visit App report (.xlsx / .csv) to
+A WhatsApp export (.zip / .txt) goes to input/, an SBI CSP Visit App report (.xlsx / .xls / .csv) to
 input/visit_reports/. Each file is checked first, and a file whose content is already there is skipped, so
 uploading the same export twice changes nothing. After saving, `run_report()` rebuilds everything exactly like
 `process.py` from the command line.
@@ -26,7 +26,7 @@ from .visits import COLUMN_ALIASES
 log = logging.getLogger(__name__)
 
 EXPORT_SUFFIXES = (".zip", ".txt")
-REPORT_SUFFIXES = (".xlsx", ".csv")
+REPORT_SUFFIXES = (".xlsx", ".xls", ".csv")
 MAX_BYTES = 10 * 1024 * 1024   # the indev nginx route accepts up to 10 MB per request
 WHATSAPP_LINE = re.compile(r"\[?\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}")
 
@@ -104,7 +104,7 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
             return UploadResult(safe, False, "Yeh SBI visit report nahi lag rahi ('CSP Code' aur 'Visit Date' column nahi mile).")
         dest_dir, kind = input_dir / "visit_reports", "Visit report"
     else:
-        return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .csv (visit report / CSP location list) daaliye.")
+        return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .xls / .csv (visit report / CSP location list) daaliye.")
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     sha = _sha(data)

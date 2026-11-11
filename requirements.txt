@@ -1,6 +1,7 @@
 # Runtime dependencies (same as [project.dependencies] in pyproject.toml)
 pandas>=2.1,<3
 openpyxl>=3.1,<4
+xlrd>=2.0   # SBI portal exports visit reports as .xls
 Pillow>=10.0
 streamlit>=1.60,<2   # dashboard uses st.dialog, keyed containers, width="stretch"; tested on 1.66
 ImageHash>=4.3

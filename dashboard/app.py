@@ -614,8 +614,8 @@ def upload_box() -> None:
         return
     with st.sidebar, st.container(border=True, key="upload_box"):
         st.markdown("### 📤 Naya data daalo")
-        st.caption("WhatsApp export (.zip / .txt) ya SBI visit report (.xlsx). Max 10 MB.")
-        files = st.file_uploader("Files", type=["zip", "txt", "xlsx", "csv"], accept_multiple_files=True,
+        st.caption("WhatsApp export (.zip / .txt) ya SBI visit report (.xlsx / .xls). Max 10 MB.")
+        files = st.file_uploader("Files", type=["zip", "txt", "xlsx", "xls", "csv"], accept_multiple_files=True,
                                  label_visibility="collapsed", key=f"up_{st.session_state.get('up_round', 0)}")
         if st.button("Upload & update", key="upload_btn", width="stretch", disabled=not files, type="primary"):
             results = [save_upload(f.name, f.getvalue(), PROJECT / "input") for f in files]
