@@ -77,7 +77,8 @@ def load_brand() -> dict:
 BRAND = load_brand()
 PRIMARY, ACCENT = BRAND["primary"], BRAND["accent"]
 
-st.set_page_config(page_title="CSP GPS Complaints | Eko", page_icon="📍", layout="wide")
+st.set_page_config(page_title="CSP GPS Complaints | Eko", page_icon="📍", layout="wide",
+                   initial_sidebar_state="expanded")
 st.markdown(f"""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
@@ -277,6 +278,8 @@ st.markdown(f"""
   .stApp button[kind="primary"]:hover {{background:#00557A !important;}}
   .stApp button[kind="primary"]:disabled {{background:#C9D9E1 !important;}}
   section[data-testid="stSidebar"] h3 {{font-size:1.05rem !important; color:{INK};}}
+  /* the upload box lives in the sidebar: no "<<" button to close it (the open button stays for small screens) */
+  [data-testid="stSidebarCollapseButton"] {{display:none !important;}}
 
 </style>""", unsafe_allow_html=True)
 
