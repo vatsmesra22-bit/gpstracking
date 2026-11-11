@@ -835,7 +835,8 @@ with tab_visits:
         dup_rows = 0
         low = u[u["Visit Score"] < LOW_SCORE]
         card_row([
-            (card("Visits done", len(u), f"CSPs · {period}", "", "📲"), "kpi_v_all", f"📲 Visits done – {len(u)} CSPs", u, "visits"),
+            (card("Visits done", len(u_all), f"{len(u)} alag CSP · {period}", "", "📲"), "kpi_v_all",
+             f"📲 Visits done – {len(u_all)} visits · {len(u)} alag CSP", u_all, "visits"),
             (card("Score 0 (not done)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
              "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (counted nahi)", zero, "visits"),
             (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
@@ -862,6 +863,7 @@ with tab_visits:
                 "Mahina": months["Month"].map(month_name),
                 "Kab se kab tak": [f"{a:%d %b} – {b:%d %b}" for a, b in zip(months["From"], months["To"], strict=True)],
                 "Visits hui": months["Visits"],
+                "Alag CSP": months["CSPs"],
                 "Poori nahi hui (score 0)": months["Score 0"],
                 "Kitne DC ne ki": months["DCs"],
                 "Average score": months["Avg Score"],

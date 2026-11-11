@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.2 – 2026-11-11
+
+### Fixed
+- Visit reports with dates typed in another format (09/11/2026, 10-11-2026, 2026-11-05) lost those visits, so a new upload did not raise the visit count. All formats are now read, with the day first.
+- The upload box accepts the SBI portal's .xls visit reports.
+- The sidebar with the upload box stays open.
+
+### Changed
+- App Visits: the "Visits done" card counts every completed visit and shows the number of separate CSPs under it. The month table has a new "Alag CSP" column.
+
 ## 1.13.1 – 2026-11-05
 
 ### Fixed

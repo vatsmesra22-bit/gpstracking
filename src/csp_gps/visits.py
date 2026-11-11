@@ -78,7 +78,8 @@ def load_visit_reports(folder: Path, project_dir: Path, users_csv: Path | None =
     v.loc[v["Circle"].isin(["", "-", "Nan", "None"]), "Circle"] = NOT_AVAILABLE
     v["DC User"] = v["DC User"].fillna(NOT_AVAILABLE).astype(str).str.strip()
     v["DC Name"] = v["DC User"].map(users).fillna("").replace("", NOT_AVAILABLE)
-    v["Visit Date"] = pd.to_datetime(v["Visit Date"], errors="coerce").dt.date
+    # SBI sheets mix real Excel dates with typed ones (09/11/2026, 10-11-2026): read each on its own, day first
+    v["Visit Date"] = pd.to_datetime(v["Visit Date"], format="mixed", dayfirst=True, errors="coerce").dt.date
     no_date = v["Visit Date"].isna()  # e.g. a blank or "Total" row at the bottom of the SBI sheet
     for rel, n in v.loc[no_date, "Source File"].value_counts().items():
         log.warning("Visit report %s: %d row(s) without a valid Visit Date skipped", rel, n)
@@ -136,9 +137,9 @@ def visit_month(visits: pd.DataFrame) -> pd.Series:
 
 
 def monthly_summary(visits: pd.DataFrame) -> pd.DataFrame:
-    """One row per month, newest first, counted like the App Visits cards: each CSP once per month (its latest
-    completed visit); score 0 only for CSPs with no completed visit that month."""
-    cols = ["Month", "From", "To", "Visits", "Score 0", "DCs", "Avg Score", "Low Score"]
+    """One row per month, newest first, counted like the App Visits cards: Visits = every completed visit,
+    CSPs = each CSP once (its latest completed visit); score 0 only for CSPs with no completed visit that month."""
+    cols = ["Month", "From", "To", "Visits", "CSPs", "Score 0", "DCs", "Avg Score", "Low Score"]
     if visits.empty:
         return pd.DataFrame(columns=cols)
     rows = []
@@ -147,7 +148,7 @@ def monthly_summary(visits: pd.DataFrame) -> pd.DataFrame:
         dates = part.loc[part["Duplicate Row"] == "No", "Visit Date"]
         if dates.empty:
             continue
-        rows.append([month, min(dates), max(dates), len(done), len(zero),
+        rows.append([month, min(dates), max(dates), len(done_visits(part)), len(done), len(zero),
                      done["DC User"].nunique() if len(done) else 0,
                      round(done["Visit Score"].mean()) if len(done) else None,
                      int((done["Visit Score"] < LOW_SCORE).sum()) if len(done) else 0])

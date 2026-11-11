@@ -348,7 +348,8 @@ def test_visits_counted_month_by_month(tmp_path):
     m = monthly_summary(v).set_index("Month")
     assert list(m.index) == ["2026-11", "2026-10"]                         # newest month first
     assert m.loc["2026-10", "Visits"] == 2 and m.loc["2026-10", "Score 0"] == 1
-    assert m.loc["2026-11", "Visits"] == 2 and m.loc["2026-11", "Score 0"] == 1   # 1A000003 done in Oct, not Nov
+    assert m.loc["2026-11", "Visits"] == 2   # every completed visit (score 0 rows are not visits)
+    assert m.loc["2026-11", "CSPs"] == 2 and m.loc["2026-11", "Score 0"] == 1   # 1A000003 done in Oct, not Nov
     assert m.loc["2026-11", "DCs"] == 1 and m.loc["2026-11", "Avg Score"] == 80 and m.loc["2026-11", "Low Score"] == 1
 
 
@@ -393,3 +394,31 @@ def test_upload_accepts_xls_visit_report(tmp_path):
         pytest.skip("no sample .xls on this PC")
     r = save_upload("Visit report.xls", b"not really excel", tmp_path)
     assert not r.ok and "visit report" in r.message.lower()
+
+
+def test_month_counts_every_visit_and_each_csp_once(tmp_path):
+    from csp_gps.visits import load_visit_reports, monthly_summary
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({"CSP Code": ["1A000001", "1A000001", "1A000002"],
+                  "Visit Date": ["2026-11-02", "2026-11-05", "2026-11-03"],
+                  "Visit Score": [90, 88, 95], "username": ["BC1", "BC1", "BC2"]}).to_excel(folder / "Nov.xlsx", index=False)
+    v, _ = load_visit_reports(folder, tmp_path)
+    m = monthly_summary(v).set_index("Month")
+    assert m.loc["2026-11", "Visits"] == 3 and m.loc["2026-11", "CSPs"] == 2   # visited twice -> 2 visits, 1 CSP
+
+
+def test_visit_dates_in_mixed_formats_are_all_read(tmp_path):
+    from datetime import date
+
+    from csp_gps.visits import load_visit_reports
+
+    folder = tmp_path / "visit_reports"
+    folder.mkdir()
+    pd.DataFrame({"CSP Code": ["1A000001", "1A000002", "1A000003", "1A000004"],
+                  "Visit Date": [pd.Timestamp("2026-11-02"), "09/11/2026", "10-11-2026", "2026-11-05"],
+                  "Visit Score": [90, 90, 90, 90]}).to_excel(folder / "Nov.xlsx", index=False)
+    v, failed = load_visit_reports(folder, tmp_path)
+    assert not failed
+    assert sorted(v["Visit Date"]) == [date(2026, 11, 2), date(2026, 11, 5), date(2026, 11, 9), date(2026, 11, 10)]
