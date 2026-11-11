@@ -5,6 +5,7 @@
 ### Fixed
 - Visit reports with dates typed in another format (09/11/2026, 10-11-2026, 2026-11-05) lost those visits, so a new upload did not raise the visit count. All formats are now read, with the day first.
 - The upload box accepts the SBI portal's .xls visit reports.
+- A visit report whose first sheet is a pivot or summary (the data on another sheet) was refused with "CSP Code aur Visit Date column nahi mile". Every sheet is now checked and the one with the visits is used.
 - The sidebar with the upload box stays open.
 
 ### Changed

@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from .locations import is_location_list
-from .visits import COLUMN_ALIASES
+from .visits import COLUMN_ALIASES, read_visit_sheet
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def _looks_like_export(name: str, data: bytes) -> bool:
 def _looks_like_visit_report(name: str, data: bytes) -> bool:
     try:
         frame = (pd.read_csv(io.BytesIO(data), nrows=5, dtype=str) if name.lower().endswith(".csv")
-                 else pd.read_excel(io.BytesIO(data), nrows=5, dtype=str))
+                 else read_visit_sheet(io.BytesIO(data), nrows=5))
     except Exception:
         return False
     cols = {COLUMN_ALIASES.get(str(c).strip().lower(), str(c).strip()) for c in frame.columns}

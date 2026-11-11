@@ -34,6 +34,17 @@ VISIT_COLUMNS = ["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "
                  "Visit Done", "Compliance Completed", "Closures Completed", "BC Code", "Duplicate Row", "Source File"]
 
 
+def read_visit_sheet(source, nrows: int | None = None) -> pd.DataFrame:
+    """The sheet of an SBI visit report that holds the visits. Reports often carry a pivot or summary sheet first,
+    so every sheet is checked and the first one with "CSP Code" and "Visit Date" columns is used."""
+    sheets = pd.read_excel(source, sheet_name=None, nrows=nrows, dtype=str)
+    for frame in sheets.values():
+        cols = {COLUMN_ALIASES.get(str(c).strip().lower(), str(c).strip()) for c in frame.columns}
+        if {"CSP Code", "Visit Date"} <= cols:
+            return frame
+    return next(iter(sheets.values()), pd.DataFrame())
+
+
 def _load_users(path: Path | None) -> dict[str, str]:
     if not path or not path.exists():
         return {}
@@ -53,7 +64,7 @@ def load_visit_reports(folder: Path, project_dir: Path, users_csv: Path | None =
         rel = path.relative_to(project_dir).as_posix() if path.is_relative_to(project_dir) else path.name
         try:
             raw = (pd.read_csv(path, dtype=str) if path.suffix.lower() == ".csv"
-                   else pd.read_excel(path, dtype=str))
+                   else read_visit_sheet(path))
         except Exception as exc:
             log.warning("Could not read visit report %s: %s", rel, exc)
             failed.append({"file": rel, "error": str(exc)})

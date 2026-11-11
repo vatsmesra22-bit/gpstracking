@@ -422,3 +422,20 @@ def test_visit_dates_in_mixed_formats_are_all_read(tmp_path):
     v, failed = load_visit_reports(folder, tmp_path)
     assert not failed
     assert sorted(v["Visit Date"]) == [date(2026, 11, 2), date(2026, 11, 5), date(2026, 11, 9), date(2026, 11, 10)]
+
+
+def test_visit_report_with_a_summary_sheet_first(tmp_path):
+    import io
+
+    from csp_gps.uploads import save_upload
+    from csp_gps.visits import load_visit_reports
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as w:
+        pd.DataFrame({"Row Labels": ["BC1", "Grand Total"], "Count": [2, 2]}).to_excel(w, sheet_name="Sheet2", index=False)
+        pd.DataFrame({"CSP Code": ["1A000001", "1A000002"], "Visit Date": ["2026-11-10", "2026-11-11"],
+                      "Visit Score": [90, 95]}).to_excel(w, sheet_name="Sheet1", index=False)
+    r = save_upload("Visit report 1st Nov to till dated.xlsx", buf.getvalue(), tmp_path)
+    assert r.ok, r.message
+    v, failed = load_visit_reports(tmp_path / "visit_reports", tmp_path)
+    assert not failed and sorted(v["CSP Code"]) == ["1A000001", "1A000002"]
