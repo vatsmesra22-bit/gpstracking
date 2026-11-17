@@ -29,7 +29,15 @@ sys.path.insert(0, str(PROJECT / "src"))
 from csp_gps.labels import PROBLEM_NAMES, STATUS_NAMES  # noqa: E402  (shared with the Excel Daily Update sheet)
 from csp_gps.locations import load_locations as read_locations  # noqa: E402
 from csp_gps.locations import merge_locations  # noqa: E402
-from csp_gps.uploads import UploadResult, log_upload, run_report, save_upload, uploads_enabled  # noqa: E402
+from csp_gps.uploads import (  # noqa: E402
+    UploadResult,
+    log_upload,
+    remove_report,
+    run_report,
+    save_upload,
+    uploaded_reports,
+    uploads_enabled,
+)
 from csp_gps.visits import LOW_SCORE, monthly_summary, visit_month  # noqa: E402
 
 try:  # DASHBOARD_PASSWORD etc. live in .env on the server
@@ -644,6 +652,19 @@ def upload_box() -> None:
             st.session_state["upload_msgs"] = [(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")]
             st.session_state["upload_tail"] = "" if ok else tail
             st.rerun()
+        reports = uploaded_reports(PROJECT / "input")
+        if reports:
+            with st.expander("🗑 Galat file hatao"):
+                gone = st.selectbox("Visit report", reports, index=None, placeholder="File chuno…",
+                                    label_visibility="collapsed", key="remove_pick")
+                if st.button("Ye file hatao", key="remove_btn", width="stretch", disabled=not gone):
+                    r = remove_report(gone, PROJECT / "input")
+                    log_upload(PROJECT / "logs", [UploadResult(r.name, r.ok, "removed: " + r.message)])
+                    ok, tail = _rebuild() if r.ok else (False, "")
+                    st.session_state["upload_msgs"] = [(r.ok, f"{r.name}: {r.message}")] + (
+                        [(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")] if r.ok else [])
+                    st.session_state["upload_tail"] = "" if ok else tail
+                    st.rerun()
         for good, msg in st.session_state.get("upload_msgs", []):
             (st.success if good else st.warning)(msg)
         if st.session_state.get("upload_tail"):

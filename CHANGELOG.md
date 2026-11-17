@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.3 – 2026-11-17
+
+### Added
+- Upload box: **🗑 Galat file hatao** takes a wrongly uploaded visit report out of use and rebuilds the report. The file is moved to `input/removed_uploads/`, never deleted.
+
+### Fixed
+- A file is taken as a visit report only if it has "CSP Code", "Visit Date" and "Visit Score". Another system's export with just CSP code and date (a `dashboard-report.csv`) was counted as visits and pushed November to 7,908.
+
 ## 1.13.2 – 2026-11-11
 
 ### Fixed

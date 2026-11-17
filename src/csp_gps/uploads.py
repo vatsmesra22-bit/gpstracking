@@ -27,6 +27,8 @@ log = logging.getLogger(__name__)
 
 EXPORT_SUFFIXES = (".zip", ".txt")
 REPORT_SUFFIXES = (".xlsx", ".xls", ".csv")
+VISIT_REPORT_COLUMNS = {"CSP Code", "Visit Date", "Visit Score"}   # SBI CSP Visit App report
+REMOVED_DIR = "removed_uploads"   # files taken out from the dashboard go here, never deleted
 MAX_BYTES = 10 * 1024 * 1024   # the indev nginx route accepts up to 10 MB per request
 WHATSAPP_LINE = re.compile(r"\[?\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}")
 
@@ -75,7 +77,7 @@ def _looks_like_visit_report(name: str, data: bytes) -> bool:
     except Exception:
         return False
     cols = {COLUMN_ALIASES.get(str(c).strip().lower(), str(c).strip()) for c in frame.columns}
-    return {"CSP Code", "Visit Date"} <= cols
+    return VISIT_REPORT_COLUMNS <= cols
 
 
 def _looks_like_location_list(name: str, data: bytes) -> bool:
@@ -101,7 +103,7 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
         dest_dir, kind = input_dir / "csp_locations", "CSP location list"
     elif suffix in REPORT_SUFFIXES:
         if not _looks_like_visit_report(safe, data):
-            return UploadResult(safe, False, "Yeh SBI visit report nahi lag rahi ('CSP Code' aur 'Visit Date' column nahi mile).")
+            return UploadResult(safe, False, "Yeh SBI visit report nahi lag rahi ('CSP Code', 'Visit Date' aur 'Visit Score' column nahi mile).")
         dest_dir, kind = input_dir / "visit_reports", "Visit report"
     else:
         return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .xls / .csv (visit report / CSP location list) daaliye.")
@@ -118,6 +120,25 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
     dest.write_bytes(data)
     log.info("Upload saved: %s (%d bytes) -> %s", safe, len(data), dest)
     return UploadResult(dest.name, True, f"{kind} joda gaya.")
+
+
+def uploaded_reports(input_dir: Path) -> list[str]:
+    """Visit report files currently used for the App Visits tab."""
+    folder = input_dir / "visit_reports"
+    return sorted(p.name for p in folder.iterdir() if p.is_file()) if folder.exists() else []
+
+
+def remove_report(name: str, input_dir: Path) -> UploadResult:
+    """Take a wrongly uploaded visit report out of use. It is moved to input/removed_uploads/, not deleted."""
+    src = input_dir / "visit_reports" / Path(name).name
+    if not src.is_file():
+        return UploadResult(name, False, "Yeh file nahi mili.")
+    dest_dir = input_dir / REMOVED_DIR
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{datetime.now():%Y%m%d_%H%M%S}__{src.name}"
+    src.rename(dest)
+    log.info("Visit report removed from use: %s -> %s", src.name, dest)
+    return UploadResult(src.name, True, "File hata di gayi (removed_uploads mein rakhi hai).")
 
 
 def log_upload(log_dir: Path, results: list[UploadResult]) -> None:

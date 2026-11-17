@@ -439,3 +439,19 @@ def test_visit_report_with_a_summary_sheet_first(tmp_path):
     assert r.ok, r.message
     v, failed = load_visit_reports(tmp_path / "visit_reports", tmp_path)
     assert not failed and sorted(v["CSP Code"]) == ["1A000001", "1A000002"]
+
+
+def test_wrong_visit_file_can_be_taken_out(tmp_path):
+    import io
+
+    from csp_gps.uploads import remove_report, save_upload, uploaded_reports
+
+    other = io.BytesIO()
+    pd.DataFrame({"CSP Code": ["1A000001"], "Visit Date": ["2026-11-02"]}).to_csv(other, index=False)
+    assert not save_upload("dashboard-report (81).csv", other.getvalue(), tmp_path).ok   # no Visit Score column
+    good = io.BytesIO()
+    pd.DataFrame({"CSP Code": ["1A000001"], "Visit Date": ["2026-11-02"], "Visit Score": [90]}).to_excel(good, index=False)
+    assert save_upload("Visit report Nov.xlsx", good.getvalue(), tmp_path).ok
+    assert uploaded_reports(tmp_path) == ["Visit report Nov.xlsx"]
+    assert remove_report("Visit report Nov.xlsx", tmp_path).ok
+    assert uploaded_reports(tmp_path) == [] and any((tmp_path / "removed_uploads").iterdir())   # moved, not deleted
