@@ -17,6 +17,7 @@ import io
 import json
 import os
 import sys
+import urllib.request
 from pathlib import Path
 
 import pandas as pd
@@ -559,10 +560,47 @@ def _expected_secret() -> tuple[str, str]:
     return ("plain", plain) if plain else ("", "")
 
 
+def _sso_api() -> str:
+    """DC Visit API base for single sign-on: DC_VISITS_SSO_API env, else settings.yaml `dc_visits_sso_api`. Empty = off."""
+    api = os.environ.get("DC_VISITS_SSO_API", "").strip()
+    if not api:
+        try:
+            cfg = yaml.safe_load((PROJECT / "config" / "settings.yaml").read_text(encoding="utf-8")) or {}
+            api = str(cfg.get("dc_visits_sso_api") or "").strip()
+        except Exception:
+            api = ""
+    return api.rstrip("/")
+
+
+def _dc_visits_sso_ok(token: str) -> bool:
+    """True when `token` is a live DC Visit dashboard login of an Admin or National Head.
+
+    The DC Visit API answers /dashboard/overview only for those two roles, so HTTP 200 is the check.
+    """
+    api = _sso_api()
+    if not api or not token or len(token) > 4096:
+        return False
+    today = pd.Timestamp.now(tz="Asia/Kolkata").strftime("%Y-%m-%d")
+    req = urllib.request.Request(f"{api}/dashboard/overview?date={today}",
+                                 headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as res:
+            return res.status == 200
+    except Exception:
+        return False
+
+
 def require_login() -> None:
     kind, secret = _expected_secret()
     if not kind or st.session_state.get("auth_ok"):
         return  # no password configured (local use) or already signed in
+    # Opened inside the DC Visit dashboard: its login stands in for the password.
+    sso = st.query_params.get("sso", "")
+    if sso:
+        del st.query_params["sso"]  # keep the token out of the address bar
+        if _dc_visits_sso_ok(sso):
+            st.session_state["auth_ok"] = True
+            st.rerun()
     st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
     _, mid, _ = st.columns([1, 1.25, 1])
     with mid, st.container(key="login_card"):

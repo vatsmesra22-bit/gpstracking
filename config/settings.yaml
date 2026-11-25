@@ -80,3 +80,7 @@ agent_contacts:
   tech_support: "Amit singh"       # GPS / location / app errors
   sbi_coordinator: "Ganesh"         # CSP mapping in the Visit App, lat/long on the portal
   manager: "Ma'am"                  # daily summary
+
+# Single sign-on from the DC Visit dashboard (indev.eko.in/dc-visits-admin, "SBI Visit App" switch).
+# An Admin / National Head logged in there opens this dashboard without the password. Empty = off.
+dc_visits_sso_api: "https://indev.eko.in/dc-visits/api/v1"
