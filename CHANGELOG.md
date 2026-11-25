@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.2 – 2026-11-25
+
+### Changed
+- Inside the DC Visit dashboard the slim title bar no longer shows the date range and the "Updated" line on the right.
+
 ## 1.14.1 – 2026-11-25
 
 ### Changed

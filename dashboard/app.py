@@ -645,10 +645,9 @@ dirs = data_dirs()
 
 def header(right: str) -> None:
     if EMBEDDED:
-        # The DC Visit dashboard already shows the Eko header and login: keep only a slim title + date line.
-        st.markdown(f"""<div class='embed-top'><div class='embed-title'>SBI CSP Visit App
-            <span class='embed-sub'>visits &amp; complaints</span></div><div class='embed-right'>{right}</div></div>""",
-                    unsafe_allow_html=True)
+        # The DC Visit dashboard already shows the Eko header and login: keep only a slim title bar.
+        st.markdown("""<div class='embed-top'><div class='embed-title'>SBI CSP Visit App
+            <span class='embed-sub'>visits &amp; complaints</span></div></div>""", unsafe_allow_html=True)
         return
     st.markdown(f"""<div class='top'><div class='left'>{logo_html}<div class='divider'></div><div>
         <div class='title-x'>CSP GPS <span class='gold'>Complaints</span></div>
