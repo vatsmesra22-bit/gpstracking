@@ -910,139 +910,181 @@ with tab_visits:
         u = u.sort_values("Visit Date").drop_duplicates("CSP Code", keep="last")
         zero = (zero[~zero["CSP Code"].isin(set(once.loc[once["Visit Done"] != "No", "CSP Code"]))]
                 .sort_values("Visit Date").drop_duplicates("CSP Code", keep="last"))
-        if u.empty:
+        if u.empty and zero.empty:
             st.info("In tarikhon mein koi app visit nahi hai.")
             st.stop()
-        period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}"
-        dup_rows = 0
+        period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}" if len(u) else "—"
         low = u[u["Visit Score"] < LOW_SCORE]
-        card_row([
-            (card("Visits done", len(u_all), f"{len(u)} alag CSP · {period}", "", "📲"), "kpi_v_all",
-             f"📲 Visits done – {len(u_all)} visits · {len(u)} alag CSP", u_all, "visits"),
-            (card("Score 0 (not done)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
-             "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (counted nahi)", zero, "visits"),
-            (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
-             "kpi_v_dc", f"👥 DCs – {u['DC User'].nunique()}", u, "dc"),
-            (card("Avg visit score", f"{u['Visit Score'].mean():.0f}", "out of 100", "orange", "⭐"),
-             "kpi_v_score", "⭐ All visits by score (lowest first)", u.sort_values("Visit Score"), "visits"),
-            (card(f"Low score (<{LOW_SCORE})", len(low), "need a look", "orange", "⚠️"),
-             "kpi_v_low", f"⚠️ Low-score visits – {len(low)}", low.sort_values("Visit Score"), "visits"),
+
+        va_done, va_notdone, va_dcwise = st.tabs([
+            f"✅ Visit Done ({len(u_all)})", f"📍 Lat/Long se nahi hua ({len(zero)})", "🎯 DC-wise Target vs Done",
         ])
-        if dup_rows:
-            st.caption(f"The report had {dup_rows} repeated row(s); each visit is counted once.")
 
-        with st.container(border=True):
-            box_title("📅 Har mahine ki visits", "Upar naya mahina, neeche purane · upar se mahina chuno toh uski "
-                      "poori details dikhegi")
-            prev = months.shift(-1)  # the month before each row
+        # --- sub-tab 1: Visit Done (everything that was here before, unchanged) -----------------------------
+        with va_done:
+            card_row([
+                (card("Visits done", len(u_all), f"{len(u)} alag CSP · {period}", "", "📲"), "kpi_v_all",
+                 f"📲 Visits done – {len(u_all)} visits · {len(u)} alag CSP", u_all, "visits"),
+                (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
+                 "kpi_v_dc", f"👥 DCs – {u['DC User'].nunique()}", u, "dc"),
+                (card("Avg visit score", f"{u['Visit Score'].mean():.0f}" if len(u) else "—", "out of 100", "orange", "⭐"),
+                 "kpi_v_score", "⭐ All visits by score (lowest first)", u.sort_values("Visit Score"), "visits"),
+                (card(f"Low score (<{LOW_SCORE})", len(low), "need a look", "orange", "⚠️"),
+                 "kpi_v_low", f"⚠️ Low-score visits – {len(low)}", low.sort_values("Visit Score"), "visits"),
+            ])
 
-            def change(now, before, word: str) -> str:
-                if pd.isna(before) or pd.isna(now) or now == before:
-                    return "" if pd.isna(before) else f"= {word} same"
-                return f"{'▲' if now > before else '▼'} {abs(now - before):.0f} {word} {'zyada' if now > before else 'kam'}"
+            with st.container(border=True):
+                box_title("📅 Har mahine ki visits", "Upar naya mahina, neeche purane · upar se mahina chuno toh uski "
+                          "poori details dikhegi")
+                prev = months.shift(-1)  # the month before each row
 
-            st.dataframe(pd.DataFrame({
-                "Mahina": months["Month"].map(month_name),
-                "Kab se kab tak": [f"{a:%d %b} – {b:%d %b}" for a, b in zip(months["From"], months["To"], strict=True)],
-                "Visits hui": months["Visits"],
-                "Alag CSP": months["CSPs"],
-                "Poori nahi hui (score 0)": months["Score 0"],
-                "Kitne DC ne ki": months["DCs"],
-                "Average score": months["Avg Score"],
-                f"{LOW_SCORE} se kam score": months["Low Score"],
-                "Pichhle mahine se": [
-                    " · ".join(x for x in (change(a, b, "visit"), change(c, d, "score")) if x) or "—"
-                    for a, b, c, d in zip(months["Visits"], prev["Visits"], months["Avg Score"], prev["Avg Score"],
-                                          strict=True)],
-            }), hide_index=True, width="stretch")
-            if len(months) == 1:
-                st.caption("Abhi ek hi mahine ka data hai. Agle mahine ki visit report aate hi woh upar aa jaayega "
-                           "aur yeh mahina neeche chala jaayega.")
-            elif months["To"].iloc[0].day < 28:
-                st.caption(f"{month_name[months['Month'].iloc[0]]} abhi chal raha hai ({months['To'].iloc[0]:%d %b} tak "
-                           "ka data), isliye pichhle poore mahine se kam dikhega.")
+                def change(now, before, word: str) -> str:
+                    if pd.isna(before) or pd.isna(now) or now == before:
+                        return "" if pd.isna(before) else f"= {word} same"
+                    return (f"{'▲' if now > before else '▼'} {abs(now - before):.0f} {word} "
+                            f"{'zyada' if now > before else 'kam'}")
 
-        with st.container(border=True):
-            box_title("📅 Date-wise app visits", "Left: har din ka total · tarikh pe click karo, right mein us din ki visits")
-            daily = (u.groupby("Visit Date")
-                     .agg(Visits=("CSP Code", "count"), DCs=("DC User", "nunique"),
-                          Avg_score=("Visit Score", "mean"), Low=("Visit Score", lambda x: int((x < LOW_SCORE).sum())))
-                     .sort_index(ascending=False).reset_index())
-            dl, dr = st.columns([5, 7], gap="medium")
-            with dl:
-                day_pick = st.dataframe(
-                    daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score", "Low": f"< {LOW_SCORE}"}),
-                    hide_index=True, width="stretch", height=420, key="vday_table", on_select="rerun",
-                    selection_mode="single-row",
-                    column_config={"Date": st.column_config.DateColumn(format="ddd, DD MMM"),
-                                   "Avg score": st.column_config.NumberColumn(format="%.0f")})
-            rows = day_pick.selection.rows
-            day = daily.iloc[rows[0] if rows else 0]["Visit Date"]
-            with dr:
-                dv = u[u["Visit Date"] == day]
-                st.markdown(f"<div class='box-title' style='font-size:1rem'>{day:%A, %d %b %Y} · {len(dv)} visit</div>"
-                            "<div class='small-note'>👇 CSP pe click karo, uski poori history khulegi</div>",
-                            unsafe_allow_html=True)
-                vv = visit_view(dv)[["CSP Code", "Circle", "DC User", "DC Name", "Visit Score"]]
-                csp_pick = st.dataframe(vv, hide_index=True, width="stretch", height=380, key="vday_visits",
-                                        on_select="rerun", selection_mode="single-row",
-                                        column_config={"Visit Score": st.column_config.ProgressColumn(
-                                            min_value=0, max_value=100, format="%d")})
-                if csp_pick.selection.rows:
-                    csp_history(str(vv.iloc[csp_pick.selection.rows[0]]["CSP Code"]))
+                st.dataframe(pd.DataFrame({
+                    "Mahina": months["Month"].map(month_name),
+                    "Kab se kab tak": [f"{a:%d %b} – {b:%d %b}"
+                                       for a, b in zip(months["From"], months["To"], strict=True)],
+                    "Visits hui": months["Visits"],
+                    "Alag CSP": months["CSPs"],
+                    "Poori nahi hui (score 0)": months["Score 0"],
+                    "Kitne DC ne ki": months["DCs"],
+                    "Average score": months["Avg Score"],
+                    f"{LOW_SCORE} se kam score": months["Low Score"],
+                    "Pichhle mahine se": [
+                        " · ".join(x for x in (change(a, b, "visit"), change(c, d, "score")) if x) or "—"
+                        for a, b, c, d in zip(months["Visits"], prev["Visits"], months["Avg Score"], prev["Avg Score"],
+                                              strict=True)],
+                }), hide_index=True, width="stretch")
+                if len(months) == 1:
+                    st.caption("Abhi ek hi mahine ka data hai. Agle mahine ki visit report aate hi woh upar aa jaayega "
+                               "aur yeh mahina neeche chala jaayega.")
+                elif months["To"].iloc[0].day < 28:
+                    st.caption(f"{month_name[months['Month'].iloc[0]]} abhi chal raha hai "
+                               f"({months['To'].iloc[0]:%d %b} tak ka data), isliye pichhle poore mahine se kam dikhega.")
 
-        with st.container(border=True):
-            box_title("🔗 Complaint wale CSPs – kya baad mein app se visit hua?",
-                      "Matches each complaint's CSP ID with the app's visit report")
-            cmp_ = f[f["CSP"] != NOT_MENTIONED].drop_duplicates("CSP")
-            in_period = cmp_[cmp_["Message Date"] <= max(u["Visit Date"])]
-            done = in_period[in_period["App Visit"].notna()]
-            not_done = in_period[in_period["App Visit"].isna()]
-            st.markdown(
-                f"<div class='split'><div class='yes'>✅ <b>App visit hua</b><div class='big' style='color:{FOREST}'>"
-                f"{len(done)}</div><div class='small-note'>CSPs visited in the app after the complaint</div></div>"
-                f"<div class='no'>❌ <b>App visit nahi dikha</b><div class='big' style='color:{RED}'>{len(not_done)}</div>"
-                f"<div class='small-note'>not in the app report till {max(u['Visit Date']):%d %b} – likely still failing</div>"
-                f"</div></div>", unsafe_allow_html=True)
-            link = pd.concat([not_done, done]).assign(
-                Visit=lambda d: d["App Visit"].map(lambda x: f"✅ {x:%d %b}" if pd.notna(x) else "❌ Not in app"))
-            st.dataframe(pd.DataFrame({
-                "CSP": link["CSP"], "Complaint date": link["Message Date"], "Problem": link["Problem"],
-                "Reported by": link["Reported By"], "App visit": link["Visit"], "Priority": link["Priority"],
-            }), hide_index=True, width="stretch", height=min(380, 38 + 35 * len(link)),
-                column_config={"Complaint date": DATE_COL})
+            if len(u):
+                with st.container(border=True):
+                    box_title("📅 Date-wise app visits",
+                              "Left: har din ka total · tarikh pe click karo, right mein us din ki visits")
+                    daily = (u.groupby("Visit Date")
+                             .agg(Visits=("CSP Code", "count"), DCs=("DC User", "nunique"),
+                                  Avg_score=("Visit Score", "mean"),
+                                  Low=("Visit Score", lambda x: int((x < LOW_SCORE).sum())))
+                             .sort_index(ascending=False).reset_index())
+                    dl, dr = st.columns([5, 7], gap="medium")
+                    with dl:
+                        day_pick = st.dataframe(
+                            daily.rename(columns={"Visit Date": "Date", "Avg_score": "Avg score",
+                                                   "Low": f"< {LOW_SCORE}"}),
+                            hide_index=True, width="stretch", height=420, key="vday_table", on_select="rerun",
+                            selection_mode="single-row",
+                            column_config={"Date": st.column_config.DateColumn(format="ddd, DD MMM"),
+                                           "Avg score": st.column_config.NumberColumn(format="%.0f")})
+                    rows = day_pick.selection.rows
+                    day = daily.iloc[rows[0] if rows else 0]["Visit Date"]
+                    with dr:
+                        dv = u[u["Visit Date"] == day]
+                        st.markdown(f"<div class='box-title' style='font-size:1rem'>{day:%A, %d %b %Y} · "
+                                    f"{len(dv)} visit</div>"
+                                    "<div class='small-note'>👇 CSP pe click karo, uski poori history khulegi</div>",
+                                    unsafe_allow_html=True)
+                        vv = visit_view(dv)[["CSP Code", "Circle", "DC User", "DC Name", "Visit Score"]]
+                        csp_pick = st.dataframe(vv, hide_index=True, width="stretch", height=380, key="vday_visits",
+                                                on_select="rerun", selection_mode="single-row",
+                                                column_config={"Visit Score": st.column_config.ProgressColumn(
+                                                    min_value=0, max_value=100, format="%d")})
+                        if csp_pick.selection.rows:
+                            csp_history(str(vv.iloc[csp_pick.selection.rows[0]]["CSP Code"]))
 
-        c1, c2, c3 = st.columns(3, gap="medium")
-        with c1, st.container(border=True):
-            box_title("🏢 Circle-wise visits", "SBI circle of the CSP")
-            drill(u, u["Circle"], "blue", view="visits", key="vcircle")
-        with c2, st.container(border=True):
-            box_title("👤 DC-wise visits", "Har DC ki apni poori visits (score > 0) · naam: config/dc_users.csv")
-            dc_label = u_all["DC User"] + u_all["DC Name"].map(lambda n: f" · {n}" if n != NA else " · naam nahi mila")
-            drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
-        with c3, st.container(border=True):
-            box_title("⭐ Visit score", "Visits in each score band")
-            bands = pd.cut(u["Visit Score"], [-1, 49, LOW_SCORE - 1, 89, 100],
-                           labels=["0–49", f"50–{LOW_SCORE - 1}", f"{LOW_SCORE}–89", "90–100"])
-            drill(u, bands.astype(str), "green", view="visits", key="vband",
-                  order=["90–100", f"{LOW_SCORE}–89", f"50–{LOW_SCORE - 1}", "0–49"])
-            if len(low):
-                st.caption(f"Low-score visits (<{LOW_SCORE}): " + ", ".join(sorted(low["CSP Code"].astype(str))[:12])
-                           + (" …" if len(low) > 12 else ""))
+                with st.container(border=True):
+                    box_title("🔗 Complaint wale CSPs – kya baad mein app se visit hua?",
+                              "Matches each complaint's CSP ID with the app's visit report")
+                    cmp_ = f[f["CSP"] != NOT_MENTIONED].drop_duplicates("CSP")
+                    in_period = cmp_[cmp_["Message Date"] <= max(u["Visit Date"])]
+                    done = in_period[in_period["App Visit"].notna()]
+                    not_done = in_period[in_period["App Visit"].isna()]
+                    st.markdown(
+                        f"<div class='split'><div class='yes'>✅ <b>App visit hua</b>"
+                        f"<div class='big' style='color:{FOREST}'>{len(done)}</div>"
+                        f"<div class='small-note'>CSPs visited in the app after the complaint</div></div>"
+                        f"<div class='no'>❌ <b>App visit nahi dikha</b>"
+                        f"<div class='big' style='color:{RED}'>{len(not_done)}</div>"
+                        f"<div class='small-note'>not in the app report till {max(u['Visit Date']):%d %b} – "
+                        f"likely still failing</div></div></div>", unsafe_allow_html=True)
+                    link = pd.concat([not_done, done]).assign(
+                        Visit=lambda d: d["App Visit"].map(lambda x: f"✅ {x:%d %b}" if pd.notna(x) else "❌ Not in app"))
+                    st.dataframe(pd.DataFrame({
+                        "CSP": link["CSP"], "Complaint date": link["Message Date"], "Problem": link["Problem"],
+                        "Reported by": link["Reported By"], "App visit": link["Visit"], "Priority": link["Priority"],
+                    }), hide_index=True, width="stretch", height=min(380, 38 + 35 * len(link)),
+                        column_config={"Complaint date": DATE_COL})
 
-        with st.container(border=True):
-            box_title("📋 Saare app visits", "From the SBI CSP Visit App report")
-            vq = st.text_input("Search visits", placeholder="🔍 CSP code, circle, DC user…", label_visibility="collapsed")
-            vt = visits if not vq else visits[visits.astype(str).apply(
-                lambda c: c.str.contains(vq, case=False, regex=False)).any(axis=1)]
-            vview = vt[["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
-                        "Visit Done", "Compliance Completed", "Closures Completed", "Duplicate Row"]]
-            st.dataframe(vview, hide_index=True, width="stretch", height=420,
-                         column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
-                                        "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
-                                                                                       format="%d")})
-            st.download_button("⬇ Visits Excel", to_excel(vview, "App Visits"), "csp_app_visits.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                c1, c2 = st.columns(2, gap="medium")
+                with c1, st.container(border=True):
+                    box_title("🏢 Circle-wise visits", "SBI circle of the CSP")
+                    drill(u, u["Circle"], "blue", view="visits", key="vcircle")
+                with c2, st.container(border=True):
+                    box_title("⭐ Visit score", "Visits in each score band")
+                    bands = pd.cut(u["Visit Score"], [-1, 49, LOW_SCORE - 1, 89, 100],
+                                   labels=["0–49", f"50–{LOW_SCORE - 1}", f"{LOW_SCORE}–89", "90–100"])
+                    drill(u, bands.astype(str), "green", view="visits", key="vband",
+                          order=["90–100", f"{LOW_SCORE}–89", f"50–{LOW_SCORE - 1}", "0–49"])
+                    if len(low):
+                        st.caption(f"Low-score visits (<{LOW_SCORE}): "
+                                   + ", ".join(sorted(low["CSP Code"].astype(str))[:12])
+                                   + (" …" if len(low) > 12 else ""))
+
+                with st.container(border=True):
+                    box_title("📋 Saare app visits", "From the SBI CSP Visit App report")
+                    vq = st.text_input("Search visits", placeholder="🔍 CSP code, circle, DC user…",
+                                       label_visibility="collapsed")
+                    vt = visits if not vq else visits[visits.astype(str).apply(
+                        lambda c: c.str.contains(vq, case=False, regex=False)).any(axis=1)]
+                    vview = vt[["CSP Code", "Visit Date", "Circle", "Branch Code", "DC User", "DC Name", "Visit Score",
+                                "Visit Done", "Compliance Completed", "Closures Completed", "Duplicate Row"]]
+                    st.dataframe(vview, hide_index=True, width="stretch", height=420,
+                                 column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
+                                                "Visit Score": st.column_config.ProgressColumn(
+                                                    min_value=0, max_value=100, format="%d")})
+                    st.download_button("⬇ Visits Excel", to_excel(vview, "App Visits"), "csp_app_visits.xlsx",
+                                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # --- sub-tab 2: visits the app recorded but did not count (lat/long too far from the CSP) -------------
+        with va_notdone:
+            card_row([
+                (card("Not done (lat/long)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
+                 "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (counted nahi)", zero, "visits"),
+            ])
+            with st.container(border=True):
+                box_title("📍 CSPs jahan visit poori nahi hui",
+                          "DC ne app mein CSP kholi, lekin location CSP ke pate se bahut door thi (score 0) — "
+                          "visit count nahi hui")
+                if zero.empty:
+                    st.success("Is mahine koi aisi visit nahi hai. 🎉")
+                else:
+                    zview = visit_view(zero)[["CSP Code", "Visit Date", "Circle", "DC User", "DC Name", "Visit Score"]]
+                    st.dataframe(zview, hide_index=True, width="stretch", height=min(420, 38 + 35 * len(zview)),
+                                 column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY")})
+                    st.download_button("⬇ Excel", to_excel(zview, "Not Done"), "csp_visits_not_done.xlsx",
+                                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        # --- sub-tab 3: DC-wise target vs done. "Done" is real (this report); "Target" needs a DC
+        # phone <-> SBI username mapping that does not exist yet, so it is never shown as a made-up number. ------
+        with va_dcwise:
+            box_title("🎯 DC-wise Target vs Done",
+                      "Target (CSPs assigned, humare DC Visit App se) abhi nahi joda gaya — DC ka phone number aur "
+                      "uska SBI username (jaise BC1A852773) ki ek list chahiye. Tab tak sirf 'Done' dikhaya ja raha hai.")
+            if u_all.empty:
+                st.info("Is mahine koi visit nahi hai.")
+            else:
+                dc_label = u_all["DC User"] + u_all["DC Name"].map(
+                    lambda n: f" · {n}" if n != NA else " · naam nahi mila")
+                drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
+                st.caption("Target column add hone ke baad yahan 'kitna karna tha vs kitna kiya' (%) bhi dikhega.")
 
 
 # --- CSP Locations ----------------------------------------------------------------------------------------------

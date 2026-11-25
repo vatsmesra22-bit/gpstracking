@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.0 – 2026-11-25
+
+### Added
+- App Visits split into 3 sub-tabs: **Visit Done** (completed visits, as before), **Lat/Long se nahi hua** (score-0 visits pulled out into their own view), and **DC-wise Target vs Done** (per-DC visit counts; shows 'Done' only for now — Target needs a DC-phone-to-SBI-username mapping that does not exist yet).
+
 ## 1.14.3 – 2026-11-25
 
 ### Changed
