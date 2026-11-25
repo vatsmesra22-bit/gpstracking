@@ -226,6 +226,15 @@ st.markdown(f"""
   .stTabs [role="tab"][aria-selected="true"] {{background:linear-gradient(120deg, {HEADER_BG}, #0092CC) !important;
                                                color:#fff !important; box-shadow:0 6px 16px rgba(0,102,143,0.25);}}
   .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{display:none;}}
+  .embed-top {{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 18px;
+      background:linear-gradient(120deg, {HEADER_BG}, #0092CC); color:#fff; border-radius:16px; padding:14px 20px;
+      margin:0 0 16px; box-shadow:0 6px 18px rgba(0,102,143,.18);}}
+  .embed-title {{font-family:"Plus Jakarta Sans", Inter, sans-serif; font-weight:800; font-size:1.25rem; letter-spacing:-.01em;}}
+  .embed-sub {{font-weight:600; font-size:.85rem; opacity:.85; margin-left:8px;}}
+  .embed-right {{font-size:.85rem; line-height:1.8; text-align:right;}}
+  .embed-right, .embed-right .live {{color:#fff;}}
+  .embed-right .chip {{display:inline-block; color:#fff; background:rgba(255,255,255,0.14);
+      border:1px solid rgba(255,255,255,0.25); border-radius:999px; padding:2px 12px; font-weight:700;}}
   section[data-testid="stSidebar"] {{background:#fff; border-right:1px solid {BORDER};}}
   .stDownloadButton button {{background:{SAFFRON_GRADIENT}; color:#fff; border:none; border-radius:12px; font-weight:600;}}
   .stDownloadButton button:hover {{color:#fff; filter:brightness(0.97);}}
@@ -600,6 +609,7 @@ def require_login() -> None:
         del st.query_params["sso"]  # keep the token out of the address bar
         if _dc_visits_sso_ok(sso):
             st.session_state["auth_ok"] = True
+            st.session_state["embedded"] = True
             st.rerun()
     st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
     _, mid, _ = st.columns([1, 1.25, 1])
@@ -627,12 +637,19 @@ def require_login() -> None:
 
 
 require_login()
+EMBEDDED = bool(st.session_state.get("embedded"))  # opened through the DC Visit dashboard (single sign-on)
 
 # --- header --------------------------------------------------------------------------------------------
 dirs = data_dirs()
 
 
 def header(right: str) -> None:
+    if EMBEDDED:
+        # The DC Visit dashboard already shows the Eko header and login: keep only a slim title + date line.
+        st.markdown(f"""<div class='embed-top'><div class='embed-title'>SBI CSP Visit App
+            <span class='embed-sub'>visits &amp; complaints</span></div><div class='embed-right'>{right}</div></div>""",
+                    unsafe_allow_html=True)
+        return
     st.markdown(f"""<div class='top'><div class='left'>{logo_html}<div class='divider'></div><div>
         <div class='title-x'>CSP GPS <span class='gold'>Complaints</span></div>
         <div class='small'>{html.escape(BRAND['company'])} <span class='since'>Since 2007</span></div>
@@ -778,8 +795,14 @@ f = f.sort_values(["_rank", "Message Date"])
 
 open_ = f["Status"].isin(["Pending", "Escalated"])
 
-tab_home, tab_agent, tab_list, tab_visits, tab_locations, tab_photos = st.tabs(
-    ["🏠 Overview", "🤖 Agent", "📋 Complaints", "🗓 App Visits", "📍 CSP Locations", "🖼 Photos"])
+if EMBEDDED:
+    # Inside the DC Visit dashboard only these three are shown; the other tabs render into a hidden box.
+    tab_home, tab_list, tab_visits = st.tabs(["🏠 Overview", "📋 Complaints", "🗓 App Visits"])
+    tab_agent = tab_locations = tab_photos = st.container(key="embed_hidden")
+    st.markdown("<style>.st-key-embed_hidden{display:none !important;}</style>", unsafe_allow_html=True)
+else:
+    tab_home, tab_agent, tab_list, tab_visits, tab_locations, tab_photos = st.tabs(
+        ["🏠 Overview", "🤖 Agent", "📋 Complaints", "🗓 App Visits", "📍 CSP Locations", "🖼 Photos"])
 
 
 # --- Overview -------------------------------------------------------------------------------------------------

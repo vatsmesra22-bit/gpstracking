@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.1 – 2026-11-25
+
+### Changed
+- Opened from the DC Visit dashboard (single sign-on): only the Overview, Complaints and App Visits tabs are shown, and the big header is replaced by a slim blue title bar (the dashboard already shows the Eko header and login). Opening the link directly is unchanged.
+
 ## 1.14.0 – 2026-11-25
 
 ### Added
