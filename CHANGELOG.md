@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.0 – 2026-11-25
+
+### Added
+- Single sign-on from the DC Visit dashboard: an Admin or National Head who opens this report through its **SBI Visit App** switch is signed in without the password. The login is checked with the DC Visit API; anyone opening the link directly still gets the password form. Setting: `dc_visits_sso_api` (`DC_VISITS_SSO_API`), empty = off.
+
 ## 1.13.3 – 2026-11-17
 
 ### Added
