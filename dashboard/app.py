@@ -795,8 +795,9 @@ f = f.sort_values(["_rank", "Message Date"])
 open_ = f["Status"].isin(["Pending", "Escalated"])
 
 if EMBEDDED:
-    # Inside the DC Visit dashboard only these three are shown; the other tabs render into a hidden box.
-    tab_home, tab_list, tab_visits = st.tabs(["🏠 Overview", "📋 Complaints", "🗓 App Visits"])
+    # Inside the DC Visit dashboard only these three are shown (App Visits opens first); the
+    # other tabs render into a hidden box.
+    tab_visits, tab_home, tab_list = st.tabs(["🗓 App Visits", "🏠 Overview", "📋 Complaints"])
     tab_agent = tab_locations = tab_photos = st.container(key="embed_hidden")
     st.markdown("<style>.st-key-embed_hidden{display:none !important;}</style>", unsafe_allow_html=True)
 else:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.3 – 2026-11-25
+
+### Changed
+- Inside the DC Visit dashboard, App Visits opens first (was Overview). Opening the link directly is unchanged.
+
 ## 1.14.2 – 2026-11-25
 
 ### Changed
