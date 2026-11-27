@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.0 – 2026-11-27
+
+### Added
+- DC-wise Target vs Done shows a Calling Sheet snapshot note (total CSPs, assigned/unassigned, active/inactive). Manually updated, not live yet — a live version needs a small DC Visit App API change that hasn't been approved.
+
 ## 1.22.1 – 2026-11-27
 
 ### Changed

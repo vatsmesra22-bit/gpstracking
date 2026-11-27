@@ -1178,6 +1178,10 @@ with tab_visits:
                       if targets else
                       "Target isn't available yet (not signed in via the DC Visit App) — showing 'Done' only. "
                       "This only shows up when opened from inside the DC Visit App.")
+            st.markdown(
+                "<div class='small-note'>📋 Calling Sheet snapshot (as of 27 Nov 2026, updated manually — "
+                "not live): <b>567</b> total CSPs · <b>432</b> assigned to a DC · <b>135</b> not yet assigned (TBA) · "
+                "<b>486</b> active · <b>81</b> inactive</div>", unsafe_allow_html=True)
             if u_all.empty:
                 st.info("No visits this month.")
             else:
