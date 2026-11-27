@@ -1178,10 +1178,18 @@ with tab_visits:
                       if targets else
                       "Target isn't available yet (not signed in via the DC Visit App) — showing 'Done' only. "
                       "This only shows up when opened from inside the DC Visit App.")
-            st.markdown(
-                "<div class='small-note'>📋 Calling Sheet snapshot (as of 27 Nov 2026, updated manually — "
-                "not live): <b>567</b> total CSPs · <b>432</b> assigned to a DC · <b>135</b> not yet assigned (TBA) · "
-                "<b>486</b> active · <b>81</b> inactive</div>", unsafe_allow_html=True)
+            with st.container(border=True):
+                box_title("📋 Calling Sheet (all CSPs)", "As of 27 Nov 2026 · updated manually, not live")
+                snap_cols = st.columns(4, gap="small")
+                for col, card_html in zip(snap_cols, [
+                    card("Total CSPs", 567, "in the Calling Sheet", "", "📋"),
+                    card("Not assigned", 135, "no DC yet (TBA)", "red", "🔴"),
+                    card("Active", 486, "terminal status: active", "green", "✅"),
+                    card("Inactive", 81, "terminal status: inactive", "red", "⛔"),
+                ], strict=True):
+                    with col:
+                        st.markdown(card_html, unsafe_allow_html=True)
+
             if u_all.empty:
                 st.info("No visits this month.")
             else:

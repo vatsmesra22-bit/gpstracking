@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.1 – 2026-11-27
+
+### Changed
+- Calling Sheet snapshot is now a proper titled card row (Total CSPs, Not assigned, Active, Inactive), matching the look of the Target/Done/Overall% cards, instead of a small text note.
+
 ## 1.23.0 – 2026-11-27
 
 ### Added
