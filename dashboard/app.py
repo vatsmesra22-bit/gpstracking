@@ -1193,6 +1193,20 @@ with tab_visits:
 
                 dc_names.sort(key=_rank_key)
 
+                if targets:
+                    total_target = sum(targets.get(dc, 0) for dc in dc_names)
+                    total_done = sum(int(done_by_dc.get(dc, 0)) for dc in dc_names if targets.get(dc))
+                    overall_pct = round(total_done / total_target * 100) if total_target else 0
+                    cols = st.columns(3, gap="small")
+                    for col, card_html in zip(cols, [
+                        card("Total CSPs (Target)", total_target, "assigned across all DCs", "", "🎯"),
+                        card("Total Visited (Done)", total_done, "distinct CSPs visited this month", "green", "✅"),
+                        card("Overall %", f"{overall_pct}%", f"vs {TARGET_PCT}% SBI guideline",
+                             "green" if overall_pct >= TARGET_PCT else "red", "📊"),
+                    ], strict=True):
+                        with col:
+                            st.markdown(card_html, unsafe_allow_html=True)
+
                 with st.container(border=True):
                     box_title("🏆 Leaderboard", f"Ranked by % of target completed · dashed line = SBI's {TARGET_PCT}% guideline"
                               if targets else "Ranked by visits done · Target not available")

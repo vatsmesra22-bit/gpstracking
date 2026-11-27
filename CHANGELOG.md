@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.0 – 2026-11-27
+
+### Added
+- DC-wise Target vs Done now opens with a "Total CSPs (Target)", "Total Visited (Done)" and "Overall %" summary row above the leaderboard — the total, then its per-DC breakdown.
+
 ## 1.20.1 – 2026-11-27
 
 ### Changed
