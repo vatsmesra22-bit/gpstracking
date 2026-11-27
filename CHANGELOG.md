@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.3 – 2026-11-27
+
+### Changed
+- "Total Visited (Done)" on DC-wise Target vs Done now matches Visit Done's own total (every visit this month, whether or not the CSP is currently matched to a known DC) instead of only counting visits that could be attributed to a DC.
+
 ## 1.23.2 – 2026-11-27
 
 ### Fixed

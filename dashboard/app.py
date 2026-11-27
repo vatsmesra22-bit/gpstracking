@@ -1226,7 +1226,10 @@ with tab_visits:
 
                 if targets:
                     total_target = sum(targets.get(dc, 0) for dc in dc_names)
-                    total_done = sum(int(done_by_dc.get(dc, 0)) for dc in dc_names if targets.get(dc))
+                    # Every visit this month counts here, whether or not its CSP is currently matched to a
+                    # DC (matches the "Visit Done" tab's own total) -- the leaderboard below only shows the
+                    # per-DC breakdown for the ones that ARE matched.
+                    total_done = len(u_all)
                     # SBI's 85% guideline is against the Calling Sheet's full CSP count, not just the ones
                     # currently assigned to a DC -- an unassigned CSP doesn't get a free pass.
                     overall_pct = round(total_done / CALLING_SHEET_TOTAL_CSPS * 100) if CALLING_SHEET_TOTAL_CSPS else 0
