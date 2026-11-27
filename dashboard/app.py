@@ -1193,37 +1193,39 @@ with tab_visits:
 
                 dc_names.sort(key=_rank_key)
 
-                if targets:
-                    st.markdown(
-                        f"<div class='dc-legend'>Dashed line <span class='mk'></span> = SBI guideline "
-                        f"(should complete {TARGET_PCT}% or more visits)</div>", unsafe_allow_html=True)
+                with st.container(border=True):
+                    box_title("🏆 Leaderboard", f"Ranked by % of target completed · dashed line = SBI's {TARGET_PCT}% guideline"
+                              if targets else "Ranked by visits done · Target not available")
+                    rows_html = []
+                    for rank, dc in enumerate(dc_names, start=1):
+                        done = int(done_by_dc.get(dc, 0))
+                        target = targets.get(dc)
+                        initial = html.escape(dc[:1].upper())
+                        name_html = (f"<span class='dcrank'>{rank}</span><span class='dcavatar'>{initial}</span>"
+                                     f"{html.escape(dc)}")
+                        if target:
+                            pct_exact = done / target * 100
+                            pct = min(100, round(pct_exact))
+                            tone = "ok" if pct_exact >= TARGET_PCT else "low"
+                            fill_cls = "" if tone == "ok" else "below"
+                            pill = f"<span class='dcpill {tone}'>{'✓ On target' if tone == 'ok' else '⚠ Behind'}</span>"
+                            rows_html.append(
+                                f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
+                                f"<div class='dcbar'><div class='dcbar-fill {fill_cls}' style='width:{pct}%'></div>"
+                                f"<div class='dcbar-mark'></div></div>"
+                                f"<div class='dcnums'><b>{done}</b> / {target} CSP</div>"
+                                f"<div class='dcpct {tone}'>{round(pct_exact)}%</div>{pill}</div>")
+                        else:
+                            rows_html.append(
+                                f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
+                                f"<div class='dcbar'><div class='dcbar-fill' style='width:0%'></div></div>"
+                                f"<div class='dcnums'><b>{done}</b> visits · target N/A</div>"
+                                f"<div class='dcpct'>—</div></div>")
+                    st.markdown("".join(rows_html), unsafe_allow_html=True)
 
-                for rank, dc in enumerate(dc_names, start=1):
-                    done = int(done_by_dc.get(dc, 0))
-                    target = targets.get(dc)
-                    initial = html.escape(dc[:1].upper())
-                    name_html = f"<span class='dcrank'>{rank}</span><span class='dcavatar'>{initial}</span>{html.escape(dc)}"
-                    if target:
-                        pct_exact = done / target * 100
-                        pct = min(100, round(pct_exact))
-                        tone = "ok" if pct_exact >= TARGET_PCT else "low"
-                        fill_cls = "" if tone == "ok" else "below"
-                        pill = (f"<span class='dcpill {tone}'>{'✓ On target' if tone == 'ok' else '⚠ Behind'}</span>")
-                        st.markdown(
-                            f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
-                            f"<div class='dcbar'><div class='dcbar-fill {fill_cls}' style='width:{pct}%'></div>"
-                            f"<div class='dcbar-mark'></div></div>"
-                            f"<div class='dcnums'><b>{done}</b> / {target} CSP</div>"
-                            f"<div class='dcpct {tone}'>{round(pct_exact)}%</div>{pill}</div>",
-                            unsafe_allow_html=True)
-                    else:
-                        st.markdown(
-                            f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
-                            f"<div class='dcbar'><div class='dcbar-fill' style='width:0%'></div></div>"
-                            f"<div class='dcnums'><b>{done}</b> visits · target N/A</div>"
-                            f"<div class='dcpct'>—</div></div>", unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
-                drill(u_all, real_dc, "orange", view="visits", limit=20, key="vdc")
+                with st.container(border=True):
+                    box_title("📋 Visit details per DC", "Click a DC to see every CSP they visited this month")
+                    drill(u_all, real_dc, "orange", view="visits", limit=20, key="vdc")
 
 
 # --- CSP Locations ----------------------------------------------------------------------------------------------

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.20.1 – 2026-11-27
+
+### Changed
+- DC-wise Target vs Done: the leaderboard and the per-DC visit-detail list now sit in their own titled, bordered cards (matching the rest of the dashboard), instead of a plain list that looked out of place below the ranked rows.
+
 ## 1.20.0 – 2026-11-27
 
 ### Changed
