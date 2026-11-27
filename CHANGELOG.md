@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.19.1 – 2026-11-27
+
+### Changed
+- Removed the "report file(s): ..." list from the App Visits month banner (too technical / cluttered). Kept the date range and the counting-rule note.
+
 ## 1.19.0 – 2026-11-27
 
 ### Fixed

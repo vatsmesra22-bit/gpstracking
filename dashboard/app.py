@@ -983,13 +983,11 @@ with tab_visits:
         once = once[visit_month(once) == month]
         u, zero = once[once["Visit Done"] != "No"], once[once["Visit Done"] == "No"]  # score 0 = not completed
         vmin, vmax = min(once["Visit Date"]), max(once["Visit Date"])
-        files = sorted({Path(x).name for x in visits["Source File"]})
         st.markdown(
             f"<div class='today quiet'><div class='today-h'>📅 {month_name[month]} · SBI CSP Visit App report: "
             f"{vmin:%d %b} – {vmax:%d %b %Y}</div>"
-            f"<div class='small-note'>Latest visit date in the report: <b>{vmax:%A, %d %b %Y}</b> · "
-            f"{len(files)} report file(s): {html.escape(', '.join(files))} · each CSP is counted once "
-            f"(even if visited on 2 days, it counts as 1) · score 0 = visit not completed, shown separately</div></div>",
+            f"<div class='small-note'>Each CSP is counted once (even if visited on 2 days, it counts as 1) · "
+            f"score 0 = visit not completed, shown separately</div></div>",
             unsafe_allow_html=True)
         vdates = st.date_input("Visit date", (vmin, vmax), min_value=vmin, max_value=vmax, key=f"visit_dates_{month}",
                                help="Show only visits made between these dates")
