@@ -622,6 +622,12 @@ def _target_pct() -> int:
 
 
 TARGET_PCT = _target_pct()
+# Calling Sheet snapshot, taken 27 Nov 2026 (manual, see CHANGELOG) -- the denominator for the SBI 85%
+# guideline is the full CSP count, not just the ones currently assigned to a DC.
+CALLING_SHEET_TOTAL_CSPS = 567
+CALLING_SHEET_NOT_ASSIGNED = 135
+CALLING_SHEET_ACTIVE = 486
+CALLING_SHEET_INACTIVE = 81
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -1182,10 +1188,10 @@ with tab_visits:
                 box_title("📋 Calling Sheet (all CSPs)", "As of 27 Nov 2026 · updated manually, not live")
                 snap_cols = st.columns(4, gap="small")
                 for col, card_html in zip(snap_cols, [
-                    card("Total CSPs", 567, "in the Calling Sheet", "", "📋"),
-                    card("Not assigned", 135, "no DC yet (TBA)", "red", "🔴"),
-                    card("Active", 486, "terminal status: active", "green", "✅"),
-                    card("Inactive", 81, "terminal status: inactive", "red", "⛔"),
+                    card("Total CSPs", CALLING_SHEET_TOTAL_CSPS, "in the Calling Sheet", "", "📋"),
+                    card("Not assigned", CALLING_SHEET_NOT_ASSIGNED, "no DC yet (TBA)", "red", "🔴"),
+                    card("Active", CALLING_SHEET_ACTIVE, "terminal status: active", "green", "✅"),
+                    card("Inactive", CALLING_SHEET_INACTIVE, "terminal status: inactive", "red", "⛔"),
                 ], strict=True):
                     with col:
                         st.markdown(card_html, unsafe_allow_html=True)
@@ -1221,13 +1227,15 @@ with tab_visits:
                 if targets:
                     total_target = sum(targets.get(dc, 0) for dc in dc_names)
                     total_done = sum(int(done_by_dc.get(dc, 0)) for dc in dc_names if targets.get(dc))
-                    overall_pct = round(total_done / total_target * 100) if total_target else 0
+                    # SBI's 85% guideline is against the Calling Sheet's full CSP count, not just the ones
+                    # currently assigned to a DC -- an unassigned CSP doesn't get a free pass.
+                    overall_pct = round(total_done / CALLING_SHEET_TOTAL_CSPS * 100) if CALLING_SHEET_TOTAL_CSPS else 0
                     cols = st.columns(3, gap="small")
                     for col, card_html in zip(cols, [
                         card("Total CSPs (Target)", total_target, "assigned across all DCs", "", "🎯"),
                         card("Total Visited (Done)", total_done, "distinct CSPs visited this month", "green", "✅"),
-                        card("Overall %", f"{overall_pct}%", f"vs {TARGET_PCT}% SBI guideline",
-                             "green" if overall_pct >= TARGET_PCT else "red", "📊"),
+                        card("Overall %", f"{overall_pct}%", f"of {CALLING_SHEET_TOTAL_CSPS} total CSPs · "
+                             f"vs {TARGET_PCT}% SBI guideline", "green" if overall_pct >= TARGET_PCT else "red", "📊"),
                     ], strict=True):
                         with col:
                             st.markdown(card_html, unsafe_allow_html=True)

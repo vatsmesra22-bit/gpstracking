@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.2 – 2026-11-27
+
+### Fixed
+- Overall % in DC-wise Target vs Done now divides by the Calling Sheet's full CSP count (567), not just the CSPs currently assigned to a DC — an unassigned CSP shouldn't get a free pass on the SBI 85% guideline.
+
 ## 1.23.1 – 2026-11-27
 
 ### Changed
