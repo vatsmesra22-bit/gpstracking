@@ -226,14 +226,14 @@ def _write_daily(ws, issues: pd.DataFrame, summary: dict) -> None:
     escalate = pending[pending["Next Step"].astype(str).str.startswith(("Escalate", "Escalated"))] if has else issues
 
     row += 1
-    numbers = [("Aaj nayi", len(new_today)), ("Kul complaints", int(not_dup.sum()) if has else 0),
-               ("Pending", len(pending)), ("Escalate karna hai", len(escalate)),
+    numbers = [("New today", len(new_today)), ("Total complaints", int(not_dup.sum()) if has else 0),
+               ("Pending", len(pending)), ("Needs escalation", len(escalate)),
                ("Solved", int((resolved & not_dup).sum()) if has else 0)]
     for i, (label, value) in enumerate(numbers):
         col = 1 + i * 2 if i < 4 else 8
         lab = ws.cell(row=row, column=col, value=label)
         lab.font = Font(bold=True, color="FFFFFF")
-        lab.fill = HEADER_FILL if label not in ("Escalate karna hai",) else PatternFill("solid", fgColor="C0392B")
+        lab.fill = HEADER_FILL if label not in ("Needs escalation",) else PatternFill("solid", fgColor="C0392B")
         lab.alignment = Alignment(horizontal="center")
         num = ws.cell(row=row + 1, column=col, value=value)
         num.font = Font(bold=True, size=20, color=NAVY)
@@ -257,20 +257,20 @@ def _write_daily(ws, issues: pd.DataFrame, summary: dict) -> None:
             ws.cell(row=row, column=2).number_format = "dd-mmm-yyyy"
         row += 2
 
-    table("Aaj ki nayi complaints", new_today, [
+    table("New complaints today", new_today, [
         ("No.", lambda r: r["Record ID"]), ("Date", lambda r: r["Message Date"]),
-        ("Kisne bheja", lambda r: r["Reported By"]), ("Problem", lambda r: problem_name(r["Issue Type"])),
+        ("Reported by", lambda r: r["Reported By"]), ("Problem", lambda r: problem_name(r["Issue Type"])),
         ("CSP ID", lambda r: r["CSP ID"]), ("WhatsApp group", lambda r: r["Group/Chat"]),
-        ("Status", lambda r: status_name(r["Resolution Status"])), ("Kya karna hai", lambda r: r["Suggested Action"]),
-    ], "Aaj koi nayi complaint nahi aayi.")
-    table("Pending complaints – sabse purani pehle", pending, [
+        ("Status", lambda r: status_name(r["Resolution Status"])), ("What to do", lambda r: r["Suggested Action"]),
+    ], "No new complaints today.")
+    table("Pending complaints – oldest first", pending, [
         ("No.", lambda r: r["Record ID"]), ("Date", lambda r: r["Message Date"]),
-        ("Kisne bheja", lambda r: r["Reported By"]), ("Problem", lambda r: problem_name(r["Issue Type"])),
-        ("CSP ID", lambda r: r["CSP ID"]), ("Kitne din se", lambda r: r["Days Pending"]),
-        ("Next step", lambda r: r["Next Step"]), ("Kya karna hai", lambda r: r["Suggested Action"]),
-    ], "Koi complaint pending nahi hai.")
+        ("Reported by", lambda r: r["Reported By"]), ("Problem", lambda r: problem_name(r["Issue Type"])),
+        ("CSP ID", lambda r: r["CSP ID"]), ("Days pending", lambda r: r["Days Pending"]),
+        ("Next step", lambda r: r["Next Step"]), ("What to do", lambda r: r["Suggested Action"]),
+    ], "No complaints pending.")
 
-    _section(ws, row, "Problem-wise ginti")
+    _section(ws, row, "Count by problem type")
     row += 1
     _header(ws, row, ["Problem", "Complaints", "Pending"])
     counts = issues[not_dup].groupby("Issue Type") if has else None

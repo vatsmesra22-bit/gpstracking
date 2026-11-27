@@ -63,7 +63,7 @@ def build_brief(issues: pd.DataFrame, prev: pd.DataFrame | None, contacts: dict 
     if len(support):
         drafts.append({
             "to": f"@{contacts['tech_support']} (tech support)",
-            "why": f"{support['CSP ID'].nunique()} CSPs pe app se visit 5+ din se nahi ho pa raha",
+            "why": f"{support['CSP ID'].nunique()} CSPs have had no app visit for 5+ days",
             "message": (f"@{contacts['tech_support']} ji, in CSPs pe SBI CSP Visit app se visit nahi ho pa raha "
                         f"(GPS / location / app error). Please check karke update dijiye:\n" + _numbered(support)),
         })
@@ -71,7 +71,7 @@ def build_brief(issues: pd.DataFrame, prev: pd.DataFrame | None, contacts: dict 
     if len(coord):
         drafts.append({
             "to": f"@{contacts['sbi_coordinator']} (SBI coordinator)",
-            "why": f"{coord['CSP ID'].nunique()} CSPs ki mapping ya lat-long portal pe update karni hai",
+            "why": f"{coord['CSP ID'].nunique()} CSPs need mapping or lat-long updated on the portal",
             "message": (f"@{contacts['sbi_coordinator']} ji, in CSPs ki Visit App mapping / exact lat-long portal pe "
                         f"update karni hai, tabhi app se visit ho payega:\n" + _numbered(coord)),
         })
@@ -80,7 +80,7 @@ def build_brief(issues: pd.DataFrame, prev: pd.DataFrame | None, contacts: dict 
         items = "\n".join(f"• {r['Message Date']:%d %b}: \"{str(r['Issue Description'])[:70]}\"" for _, r in g.iterrows())
         drafts.append({
             "to": f"@{dc}",
-            "why": f"{len(g)} complaint(s) mein CSP ID nahi hai",
+            "why": f"{len(g)} complaint(s) missing a CSP ID",
             "message": f"@{dc} ji, in complaints ka CSP ID bhej dijiye taaki report mein sahi CSP ke saath jud sake:\n{items}",
         })
     total, pend = len(cur), len(open_)
@@ -93,7 +93,7 @@ def build_brief(issues: pd.DataFrame, prev: pd.DataFrame | None, contacts: dict 
         + (f"• Sabse purani pending: {open_.iloc[0]['CSP ID']} ({open_.iloc[0]['Message Date']:%d %b}, "
            f"{problem_name(open_.iloc[0]['Issue Type'])})" if len(open_) else "• Koi complaint pending nahi")
     )
-    drafts.insert(0, {"to": contacts["manager"], "why": "Roz ka chhota update", "message": summary_msg})
+    drafts.insert(0, {"to": contacts["manager"], "why": "Daily quick update", "message": summary_msg})
 
     def rows(d: pd.DataFrame) -> list[dict]:
         return [{"id": r["Record ID"], "date": f"{r['Message Date']}", "csp": r["CSP ID"],

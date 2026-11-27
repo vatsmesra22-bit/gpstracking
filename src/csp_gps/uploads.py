@@ -37,7 +37,7 @@ WHATSAPP_LINE = re.compile(r"\[?\d{1,2}/\d{1,2}/\d{2,4},?\s+\d{1,2}:\d{2}")
 class UploadResult:
     name: str
     ok: bool          # saved as a new file
-    message: str      # short Hinglish line for the dashboard
+    message: str      # short line shown in the dashboard
     known: bool = False   # valid file that is already in input/ (still worth a report rebuild)
 
 
@@ -94,32 +94,32 @@ def save_upload(name: str, data: bytes, input_dir: Path) -> UploadResult:
     safe = _safe_name(name)
     suffix = Path(safe).suffix.lower()
     if len(data) > MAX_BYTES:
-        return UploadResult(safe, False, "File 10 MB se badi hai. WhatsApp export 'Without media' karke daaliye.")
+        return UploadResult(safe, False, "File is bigger than 10 MB. Export WhatsApp with 'Without media'.")
     if suffix in EXPORT_SUFFIXES:
         if not _looks_like_export(safe, data):
-            return UploadResult(safe, False, "Yeh WhatsApp chat export nahi lag raha (chat ki .txt nahi mili).")
+            return UploadResult(safe, False, "This doesn't look like a WhatsApp chat export (chat .txt not found).")
         dest_dir, kind = input_dir, "WhatsApp export"
     elif suffix in REPORT_SUFFIXES and _looks_like_location_list(safe, data):
         dest_dir, kind = input_dir / "csp_locations", "CSP location list"
     elif suffix in REPORT_SUFFIXES:
         if not _looks_like_visit_report(safe, data):
-            return UploadResult(safe, False, "Yeh SBI visit report nahi lag rahi ('CSP Code', 'Visit Date' aur 'Visit Score' column nahi mile).")
+            return UploadResult(safe, False, "This doesn't look like an SBI visit report ('CSP Code', 'Visit Date' and 'Visit Score' columns not found).")
         dest_dir, kind = input_dir / "visit_reports", "Visit report"
     else:
-        return UploadResult(safe, False, "Sirf .zip / .txt (WhatsApp) ya .xlsx / .xls / .csv (visit report / CSP location list) daaliye.")
+        return UploadResult(safe, False, "Only .zip / .txt (WhatsApp) or .xlsx / .xls / .csv (visit report / CSP location list) are accepted.")
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     sha = _sha(data)
     for existing in dest_dir.iterdir():
         if existing.is_file() and existing.suffix.lower() == suffix and _sha(existing.read_bytes()) == sha:
-            return UploadResult(safe, False, f"Yeh file pehle se hai ({existing.name}), report usse dobara banegi.",
+            return UploadResult(safe, False, f"This file is already here ({existing.name}); the report will be rebuilt from it.",
                                 known=True)
     dest = dest_dir / safe
     if dest.exists():
         dest = dest_dir / f"{Path(safe).stem}__{sha[:8]}{suffix}"
     dest.write_bytes(data)
     log.info("Upload saved: %s (%d bytes) -> %s", safe, len(data), dest)
-    return UploadResult(dest.name, True, f"{kind} joda gaya.")
+    return UploadResult(dest.name, True, f"{kind} added.")
 
 
 def uploaded_reports(input_dir: Path) -> list[str]:
@@ -132,13 +132,13 @@ def remove_report(name: str, input_dir: Path) -> UploadResult:
     """Take a wrongly uploaded visit report out of use. It is moved to input/removed_uploads/, not deleted."""
     src = input_dir / "visit_reports" / Path(name).name
     if not src.is_file():
-        return UploadResult(name, False, "Yeh file nahi mili.")
+        return UploadResult(name, False, "File not found.")
     dest_dir = input_dir / REMOVED_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"{datetime.now():%Y%m%d_%H%M%S}__{src.name}"
     src.rename(dest)
     log.info("Visit report removed from use: %s -> %s", src.name, dest)
-    return UploadResult(src.name, True, "File hata di gayi (removed_uploads mein rakhi hai).")
+    return UploadResult(src.name, True, "File removed (kept in removed_uploads).")
 
 
 def log_upload(log_dir: Path, results: list[UploadResult]) -> None:

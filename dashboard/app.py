@@ -484,7 +484,7 @@ VIEWS = {"complaints": complaint_view, "csp": csp_view, "visits": visit_view, "d
 def show_list(title: str, frame: pd.DataFrame, kind: str = "complaints") -> None:
     st.markdown(f"<div class='box-title' style='font-size:1.25rem'>{html.escape(title)}</div>", unsafe_allow_html=True)
     if frame.empty:
-        st.info("Is mein abhi kuch nahi hai.")
+        st.info("There's nothing here yet.")
         return
     view = VIEWS[kind](frame)
     st.caption(f"{len(view)} row(s)")
@@ -510,7 +510,7 @@ def drill(frame: pd.DataFrame, keys: pd.Series, color: str = "blue", view: str =
         counts = counts.reindex([o for o in order if o in counts.index])
     counts = counts[counts > 0]
     if counts.empty:
-        st.markdown("<div class='small-note'>Kuch nahi hai.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='small-note'>Nothing here.</div>", unsafe_allow_html=True)
         return
     for i, (name, n) in enumerate(counts.head(limit).items(), start=1):
         badge = "gray" if name == NOT_MENTIONED else color
@@ -522,7 +522,7 @@ def drill(frame: pd.DataFrame, keys: pd.Series, color: str = "blue", view: str =
             if view == "visits":
                 st.caption(f"{len(sub)} visit · {sub['CSP Code'].nunique()} CSP · avg score "
                            f"{sub['Visit Score'].mean():.0f} · score < {LOW_SCORE}: {int((sub['Visit Score'] < LOW_SCORE).sum())}"
-                           " · 👇 CSP pe click karo, uski poori history khulegi")
+                           " · 👇 Click a CSP to open its full history")
             picked = st.dataframe(v, hide_index=True, width="stretch", height=min(360, 40 + 35 * len(v)),
                                   key=f"{key}_{i}", on_select="rerun" if view == "visits" else "ignore",
                                   selection_mode="single-row",
@@ -537,22 +537,22 @@ def drill(frame: pd.DataFrame, keys: pd.Series, color: str = "blue", view: str =
         st.caption(f"+ {len(counts) - limit} more – use the filters on the left to see them")
 
 
-@st.dialog("📍 CSP ki poori history", width="large")
+@st.dialog("📍 Full CSP history", width="large")
 def csp_history(code: str) -> None:
     st.markdown(f"<div class='box-title' style='font-size:1.25rem'>CSP {html.escape(code)}</div>", unsafe_allow_html=True)
     cv = visits[(visits["CSP Code"] == code) & (visits["Duplicate Row"] == "No")].sort_values("Visit Date")
-    box_title("🗓 App visits", f"{len(cv)} visit (score 0 bhi)")
+    box_title("🗓 App visits", f"{len(cv)} visit(s) (including score 0)")
     if cv.empty:
-        st.info("Is CSP ki koi app visit nahi hai.")
+        st.info("No app visits for this CSP.")
     else:
         st.dataframe(visit_view(cv), hide_index=True, width="stretch",
                      column_config={"Visit Date": st.column_config.DateColumn(format="DD MMM YYYY"),
                                     "Visit Score": st.column_config.ProgressColumn(min_value=0, max_value=100,
                                                                                    format="%d")})
     cc = df[(df["CSP"] == code) & (df["Duplicate Flag"] != "Possible Duplicate")]
-    box_title("📋 WhatsApp complaints", f"{len(cc)} complaint")
+    box_title("📋 WhatsApp complaints", f"{len(cc)} complaint(s)")
     if cc.empty:
-        st.info("Is CSP ki koi complaint nahi aayi.")
+        st.info("No complaints for this CSP.")
     else:
         st.dataframe(complaint_view(cc)[["No.", "Date", "Problem", "Reported by", "Status", "App visit", "Message"]],
                      hide_index=True, width="stretch", column_config={"Date": DATE_COL})
@@ -564,7 +564,7 @@ def card_row(items: list[tuple]) -> None:
     for col, (card_html, key, title, frame, kind) in zip(cols, items, strict=True):
         with col:
             st.markdown(card_html, unsafe_allow_html=True)
-            if st.button("Dekho ▸", key=key, width="stretch", help=f"Open: {title}"):
+            if st.button("View ▸", key=key, width="stretch", help=f"Open: {title}"):
                 show_list(title, frame, kind)
 
 # --- logo ----------------------------------------------------------------------------------------------
@@ -674,7 +674,7 @@ def require_login() -> None:
             unsafe_allow_html=True)
         with st.form("login", border=False):
             st.markdown("<div class='login-label'>🔒 Team login</div>", unsafe_allow_html=True)
-            pw = st.text_input("Password", type="password", placeholder="Password daaliye",
+            pw = st.text_input("Password", type="password", placeholder="Enter password",
                                label_visibility="collapsed")
             ok = st.form_submit_button("Open dashboard  →", width="stretch", key="login_btn")
         if ok:
@@ -682,7 +682,7 @@ def require_login() -> None:
             if hmac.compare_digest(given, secret):
                 st.session_state["auth_ok"] = True
                 st.rerun()
-            st.error("Password galat hai. Dobara try kijiye.")
+            st.error("Incorrect password. Please try again.")
         st.markdown("<div class='login-foot'>Internal use only · phone numbers hidden · data stays on Eko systems</div>",
                     unsafe_allow_html=True)
     st.stop()
@@ -724,7 +724,7 @@ UPLOADS_ON = uploads_enabled(os.environ)
 
 
 def _rebuild() -> tuple[bool, str]:
-    with st.spinner("Report ban rahi hai… (1–2 minute)"):
+    with st.spinner("Building report… (1–2 minutes)"):
         ok, tail = run_report(PROJECT)
     log_upload(PROJECT / "logs", [UploadResult("(rebuild)", ok, "report rebuilt" if ok else "report failed")])
     return ok, tail
@@ -735,8 +735,8 @@ def upload_box() -> None:
     if not UPLOADS_ON:
         return
     with st.sidebar, st.container(border=True, key="upload_box"):
-        st.markdown("### 📤 Naya data daalo")
-        st.caption("WhatsApp export (.zip / .txt) ya SBI visit report (.xlsx / .xls). Max 10 MB.")
+        st.markdown("### 📤 Add new data")
+        st.caption("WhatsApp export (.zip / .txt) or SBI visit report (.xlsx / .xls). Max 10 MB.")
         files = st.file_uploader("Files", type=["zip", "txt", "xlsx", "xls", "csv"], accept_multiple_files=True,
                                  label_visibility="collapsed", key=f"up_{st.session_state.get('up_round', 0)}")
         if st.button("Upload & update", key="upload_btn", width="stretch", disabled=not files, type="primary"):
@@ -748,27 +748,27 @@ def upload_box() -> None:
             ok, tail = _rebuild() if rebuild else (False, "")
             st.session_state["upload_msgs"] = (
                 [(r.ok or r.known, f"{r.name}: {r.message}") for r in results]
-                + ([(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")] if rebuild else []))
+                + ([(ok, "Report updated ✅" if ok else "Report failed – see details below")] if rebuild else []))
             st.session_state["upload_tail"] = "" if ok else tail
             st.session_state["up_round"] = st.session_state.get("up_round", 0) + 1  # clears the picker
             st.rerun()
-        if st.button("🔄 Report dobara banao", key="rebuild_btn", width="stretch",
-                     help="Jo bhi files server par hain, unse report fir se banao"):
+        if st.button("🔄 Rebuild report", key="rebuild_btn", width="stretch",
+                     help="Rebuild the report from whatever files are on the server"):
             ok, tail = _rebuild()
-            st.session_state["upload_msgs"] = [(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")]
+            st.session_state["upload_msgs"] = [(ok, "Report updated ✅" if ok else "Report failed – see details below")]
             st.session_state["upload_tail"] = "" if ok else tail
             st.rerun()
         reports = uploaded_reports(PROJECT / "input")
         if reports:
-            with st.expander("🗑 Galat file hatao"):
-                gone = st.selectbox("Visit report", reports, index=None, placeholder="File chuno…",
+            with st.expander("🗑 Remove a wrong file"):
+                gone = st.selectbox("Visit report", reports, index=None, placeholder="Choose a file…",
                                     label_visibility="collapsed", key="remove_pick")
-                if st.button("Ye file hatao", key="remove_btn", width="stretch", disabled=not gone):
+                if st.button("Remove this file", key="remove_btn", width="stretch", disabled=not gone):
                     r = remove_report(gone, PROJECT / "input")
                     log_upload(PROJECT / "logs", [UploadResult(r.name, r.ok, "removed: " + r.message)])
                     ok, tail = _rebuild() if r.ok else (False, "")
                     st.session_state["upload_msgs"] = [(r.ok, f"{r.name}: {r.message}")] + (
-                        [(ok, "Report update ho gayi ✅" if ok else "Report nahi bani – neeche detail")] if r.ok else [])
+                        [(ok, "Report updated ✅" if ok else "Report failed – see details below")] if r.ok else [])
                     st.session_state["upload_tail"] = "" if ok else tail
                     st.rerun()
         for good, msg in st.session_state.get("upload_msgs", []):
@@ -781,7 +781,7 @@ upload_box()
 
 if not dirs:
     header("")
-    st.info("Abhi data nahi hai. Left side '📤 Naya data daalo' mein WhatsApp export daaliye"
+    st.info("No data yet. Add a WhatsApp export via '📤 Add new data' on the left"
             if UPLOADS_ON else "No data yet. Put the WhatsApp export in Downloads and double-click 'Update Report.bat'.")
     st.stop()
 
@@ -811,7 +811,7 @@ is_test = summary.get("data_source") == "SYNTHETIC TEST DATA"
 start, end = summary.get("period_start") or "—", summary.get("period_end") or "—"
 header(f"<span class='chip'>📅 {start} → {end}</span><br><span class='live'><span class='dot'></span>"
        f"Updated {str(summary.get('generated_at', '')).replace('T', ' ')[:16]} · "
-       f"{'📤 upload se update' if UPLOADS_ON else 'auto 10:00 &amp; 15:00'}</span>")
+       f"{'📤 updated via upload' if UPLOADS_ON else 'auto 10:00 &amp; 15:00'}</span>")
 if is_test:
     st.markdown("<div class='test'>⚠ TEST DATA – these are not real complaints.</div>", unsafe_allow_html=True)
 if df.empty:
@@ -871,12 +871,12 @@ with tab_home:
          "kpi_solved", f"✅ Solved – {len(solved)}", solved, "complaints"),
     ])
     with st.container(border=True):
-        box_title(f"⏳ Pending complaints – {len(pending)}", "Sabse zaroori upar · poori detail 📋 Complaints tab mein")
+        box_title(f"⏳ Pending complaints – {len(pending)}", "Most urgent first · full detail in the 📋 Complaints tab")
         if len(pending):
             color_of = {name: color for name, _, color in PRIORITIES}
             cards_html = []
             for _, r in pending.iterrows():
-                days = "" if pd.isna(r["Days Pending"]) else f"{int(r['Days Pending'])} din se pending"
+                days = "" if pd.isna(r["Days Pending"]) else f"pending {int(r['Days Pending'])} day(s)"
                 cards_html.append(
                     f"<div class='cc' style='--c:{color_of.get(r['Priority'], PRIMARY)}'>"
                     f"<div><div class='csp'>{html.escape(r['CSP'])}</div><div class='id'>{html.escape(r['Record ID'])} · "
@@ -887,12 +887,12 @@ with tab_home:
                     f"<div class='act'>{html.escape(r['Suggested Action'])}</div></div></div>")
             st.markdown("".join(cards_html), unsafe_allow_html=True)
         else:
-            st.success("Kuch pending nahi hai. 🎉")
+            st.success("Nothing pending. 🎉")
 
 # --- Complaints ------------------------------------------------------------------------------------------------
 with tab_list:
     c1, c2 = st.columns([3, 2])
-    q = c1.text_input("Search", placeholder="🔍 CSP ID, DC name, district ya koi bhi shabd…", label_visibility="collapsed")
+    q = c1.text_input("Search", placeholder="🔍 CSP ID, DC name, district, or any word…", label_visibility="collapsed")
     pick = c2.segmented_control("Priority", ["All"] + [n for n, _, _ in PRIORITIES], default="All",
                                 label_visibility="collapsed")
     t = f
@@ -930,16 +930,17 @@ with tab_list:
 # --- App Visits ------------------------------------------------------------------------------------------------
 with tab_visits:
     if visits.empty:
-        st.info("Abhi koi visit report nahi hai. SBI CSP Visit App ki report (\"Visit report ... .xlsx\") Downloads mein "
-                "daal ke 'Update Report.bat' chalaiye.")
+        st.info("No visit report yet. Put the SBI CSP Visit App report (\"Visit report ... .xlsx\") in Downloads "
+                "and run 'Update Report.bat'.")
     else:
         once = visits[visits["Duplicate Row"] == "No"]
         months = monthly_summary(visits)
         month_name = {m: pd.Period(m).strftime("%B %Y") for m in months["Month"]}
         # the key carries the newest month, so when a new month's report arrives the page jumps to it
-        month = st.pills("Mahina", list(months["Month"]), default=months["Month"].iloc[0],
+        month = st.pills("Month", list(months["Month"]), default=months["Month"].iloc[0],
                          key=f"visit_month_{months['Month'].iloc[0]}",
-                         format_func=lambda m: f"📅 {month_name[m]}", help="Ek mahina chuno, neeche sab usi mahine ka dikhega")
+                         format_func=lambda m: f"📅 {month_name[m]}",
+                         help="Pick a month, everything below will show that month's data")
         month = month or months["Month"].iloc[0]
         once = once[visit_month(once) == month]
         u, zero = once[once["Visit Done"] != "No"], once[once["Visit Done"] == "No"]  # score 0 = not completed
@@ -949,8 +950,8 @@ with tab_visits:
             f"<div class='today quiet'><div class='today-h'>📅 {month_name[month]} · SBI CSP Visit App report: "
             f"{vmin:%d %b} – {vmax:%d %b %Y}</div>"
             f"<div class='small-note'>Latest visit date in the report: <b>{vmax:%A, %d %b %Y}</b> · "
-            f"{len(files)} report file(s): {html.escape(', '.join(files))} · har CSP ek hi baar gina gaya "
-            f"(2 din visit hui toh bhi 1) · score 0 = visit poori nahi hui, alag dikhaya</div></div>",
+            f"{len(files)} report file(s): {html.escape(', '.join(files))} · each CSP is counted once "
+            f"(even if visited on 2 days, it counts as 1) · score 0 = visit not completed, shown separately</div></div>",
             unsafe_allow_html=True)
         vdates = st.date_input("Visit date", (vmin, vmax), min_value=vmin, max_value=vmax, key=f"visit_dates_{month}",
                                help="Show only visits made between these dates")
@@ -963,20 +964,20 @@ with tab_visits:
         zero = (zero[~zero["CSP Code"].isin(set(once.loc[once["Visit Done"] != "No", "CSP Code"]))]
                 .sort_values("Visit Date").drop_duplicates("CSP Code", keep="last"))
         if u.empty and zero.empty:
-            st.info("In tarikhon mein koi app visit nahi hai.")
+            st.info("No app visits in this date range.")
             st.stop()
         period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}" if len(u) else "—"
         low = u[u["Visit Score"] < LOW_SCORE]
 
         va_done, va_notdone, va_dcwise = st.tabs([
-            f"✅ Visit Done ({len(u_all)})", f"📍 Lat/Long se nahi hua ({len(zero)})", "🎯 DC-wise Target vs Done",
+            f"✅ Visit Done ({len(u_all)})", f"📍 Not Done (Lat/Long) ({len(zero)})", "🎯 DC-wise Target vs Done",
         ])
 
         # --- sub-tab 1: Visit Done (everything that was here before, unchanged) -----------------------------
         with va_done:
             card_row([
-                (card("Visits done", len(u_all), f"{len(u)} alag CSP · {period}", "", "📲"), "kpi_v_all",
-                 f"📲 Visits done – {len(u_all)} visits · {len(u)} alag CSP", u_all, "visits"),
+                (card("Visits done", len(u_all), f"{len(u)} distinct CSPs · {period}", "", "📲"), "kpi_v_all",
+                 f"📲 Visits done – {len(u_all)} visits · {len(u)} distinct CSPs", u_all, "visits"),
                 (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
                  "kpi_v_dc", f"👥 DCs – {u['DC User'].nunique()}", u, "dc"),
                 (card("Avg visit score", f"{u['Visit Score'].mean():.0f}" if len(u) else "—", "out of 100", "orange", "⭐"),
@@ -986,42 +987,43 @@ with tab_visits:
             ])
 
             with st.container(border=True):
-                box_title("📅 Har mahine ki visits", "Upar naya mahina, neeche purane · upar se mahina chuno toh uski "
-                          "poori details dikhegi")
+                box_title("📅 Monthly visits", "Newest month on top, older below · pick a month above to see its "
+                          "full details")
                 prev = months.shift(-1)  # the month before each row
 
                 def change(now, before, word: str) -> str:
                     if pd.isna(before) or pd.isna(now) or now == before:
                         return "" if pd.isna(before) else f"= {word} same"
                     return (f"{'▲' if now > before else '▼'} {abs(now - before):.0f} {word} "
-                            f"{'zyada' if now > before else 'kam'}")
+                            f"{'more' if now > before else 'less'}")
 
                 st.dataframe(pd.DataFrame({
-                    "Mahina": months["Month"].map(month_name),
-                    "Kab se kab tak": [f"{a:%d %b} – {b:%d %b}"
+                    "Month": months["Month"].map(month_name),
+                    "Period": [f"{a:%d %b} – {b:%d %b}"
                                        for a, b in zip(months["From"], months["To"], strict=True)],
-                    "Visits hui": months["Visits"],
-                    "Alag CSP": months["CSPs"],
-                    "Poori nahi hui (score 0)": months["Score 0"],
-                    "Kitne DC ne ki": months["DCs"],
+                    "Visits": months["Visits"],
+                    "Distinct CSPs": months["CSPs"],
+                    "Not completed (score 0)": months["Score 0"],
+                    "DCs who visited": months["DCs"],
                     "Average score": months["Avg Score"],
-                    f"{LOW_SCORE} se kam score": months["Low Score"],
-                    "Pichhle mahine se": [
+                    f"Score below {LOW_SCORE}": months["Low Score"],
+                    "vs previous month": [
                         " · ".join(x for x in (change(a, b, "visit"), change(c, d, "score")) if x) or "—"
                         for a, b, c, d in zip(months["Visits"], prev["Visits"], months["Avg Score"], prev["Avg Score"],
                                               strict=True)],
                 }), hide_index=True, width="stretch")
                 if len(months) == 1:
-                    st.caption("Abhi ek hi mahine ka data hai. Agle mahine ki visit report aate hi woh upar aa jaayega "
-                               "aur yeh mahina neeche chala jaayega.")
+                    st.caption("Only one month of data so far. As soon as next month's visit report arrives, it "
+                               "will move to the top and this month will move down.")
                 elif months["To"].iloc[0].day < 28:
-                    st.caption(f"{month_name[months['Month'].iloc[0]]} abhi chal raha hai "
-                               f"({months['To'].iloc[0]:%d %b} tak ka data), isliye pichhle poore mahine se kam dikhega.")
+                    st.caption(f"{month_name[months['Month'].iloc[0]]} is still in progress "
+                               f"(data till {months['To'].iloc[0]:%d %b}), so it will show less than a full "
+                               f"previous month.")
 
             if len(u):
                 with st.container(border=True):
                     box_title("📅 Date-wise app visits",
-                              "Left: har din ka total · tarikh pe click karo, right mein us din ki visits")
+                              "Left: daily total · click a date to see that day's visits on the right")
                     daily = (u.groupby("Visit Date")
                              .agg(Visits=("CSP Code", "count"), DCs=("DC User", "nunique"),
                                   Avg_score=("Visit Score", "mean"),
@@ -1042,7 +1044,7 @@ with tab_visits:
                         dv = u[u["Visit Date"] == day]
                         st.markdown(f"<div class='box-title' style='font-size:1rem'>{day:%A, %d %b %Y} · "
                                     f"{len(dv)} visit</div>"
-                                    "<div class='small-note'>👇 CSP pe click karo, uski poori history khulegi</div>",
+                                    "<div class='small-note'>👇 Click a CSP to open its full history</div>",
                                     unsafe_allow_html=True)
                         vv = visit_view(dv)[["CSP Code", "Circle", "DC User", "DC Name", "Visit Score"]]
                         csp_pick = st.dataframe(vv, hide_index=True, width="stretch", height=380, key="vday_visits",
@@ -1053,17 +1055,17 @@ with tab_visits:
                             csp_history(str(vv.iloc[csp_pick.selection.rows[0]]["CSP Code"]))
 
                 with st.container(border=True):
-                    box_title("🔗 Complaint wale CSPs – kya baad mein app se visit hua?",
+                    box_title("🔗 CSPs with complaints – did an app visit happen afterwards?",
                               "Matches each complaint's CSP ID with the app's visit report")
                     cmp_ = f[f["CSP"] != NOT_MENTIONED].drop_duplicates("CSP")
                     in_period = cmp_[cmp_["Message Date"] <= max(u["Visit Date"])]
                     done = in_period[in_period["App Visit"].notna()]
                     not_done = in_period[in_period["App Visit"].isna()]
                     st.markdown(
-                        f"<div class='split'><div class='yes'>✅ <b>App visit hua</b>"
+                        f"<div class='split'><div class='yes'>✅ <b>App visit happened</b>"
                         f"<div class='big' style='color:{FOREST}'>{len(done)}</div>"
                         f"<div class='small-note'>CSPs visited in the app after the complaint</div></div>"
-                        f"<div class='no'>❌ <b>App visit nahi dikha</b>"
+                        f"<div class='no'>❌ <b>No app visit shown</b>"
                         f"<div class='big' style='color:{RED}'>{len(not_done)}</div>"
                         f"<div class='small-note'>not in the app report till {max(u['Visit Date']):%d %b} – "
                         f"likely still failing</div></div></div>", unsafe_allow_html=True)
@@ -1108,15 +1110,15 @@ with tab_visits:
         # --- sub-tab 2: visits the app recorded but did not count (lat/long too far from the CSP) -------------
         with va_notdone:
             card_row([
-                (card("Not done (lat/long)", len(zero), "app mein aayi, poori nahi hui", "red", "⛔"),
-                 "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (counted nahi)", zero, "visits"),
+                (card("Not done (lat/long)", len(zero), "recorded in app, not completed", "red", "⛔"),
+                 "kpi_v_zero", f"⛔ Score 0 visits – {len(zero)} (not counted)", zero, "visits"),
             ])
             with st.container(border=True):
-                box_title("📍 CSPs jahan visit poori nahi hui",
-                          "DC ne app mein CSP kholi, lekin location CSP ke pate se bahut door thi (score 0) — "
-                          "visit count nahi hui")
+                box_title("📍 CSPs where the visit wasn't completed",
+                          "The DC opened the CSP in the app, but the location was too far from the CSP's "
+                          "address (score 0) — the visit wasn't counted")
                 if zero.empty:
-                    st.success("Is mahine koi aisi visit nahi hai. 🎉")
+                    st.success("No such visits this month. 🎉")
                 else:
                     zview = visit_view(zero)[["CSP Code", "Visit Date", "Circle", "DC User", "DC Name", "Visit Score"]]
                     st.dataframe(zview, hide_index=True, width="stretch", height=min(420, 38 + 35 * len(zview)),
@@ -1129,20 +1131,20 @@ with tab_visits:
         with va_dcwise:
             targets = dc_targets(st.session_state.get("sso_token", ""))
             box_title("🎯 DC-wise Target vs Done",
-                      "Target = DC Visit App ke hisab se us DC ko kitne CSP assign hain (live) · "
-                      "Done = is mahine CSP Visit App mein kitni visit hui (score ≥ counted)"
+                      "Target = how many CSPs are assigned to that DC per the DC Visit App (live) · "
+                      "Done = how many visits were completed this month in the CSP Visit App (score ≥ counted)"
                       if targets else
-                      "Target abhi nahi mil paya (DC Visit App se login nahi mila) — sirf 'Done' dikhaya ja raha hai. "
-                      "Ye sirf DC Visit App ke andar se khulne par dikhta hai.")
+                      "Target isn't available yet (not signed in via the DC Visit App) — showing 'Done' only. "
+                      "This only shows up when opened from inside the DC Visit App.")
             if u_all.empty:
-                st.info("Is mahine koi visit nahi hai.")
+                st.info("No visits this month.")
             else:
                 done_by_dc = u_all.groupby("DC Name")["CSP Code"].nunique()
                 dc_names = sorted(set(done_by_dc.index) | set(targets.keys()), key=lambda n: -done_by_dc.get(n, 0))
                 if targets:
                     st.markdown(
                         f"<div class='dc-legend'>Dashed line <span class='mk'></span> = SBI guideline "
-                        f"({TARGET_PCT}% ya zyada visit poori honi chahiye)</div>", unsafe_allow_html=True)
+                        f"(should complete {TARGET_PCT}% or more visits)</div>", unsafe_allow_html=True)
                 for dc in dc_names:
                     if dc == NA or not dc:
                         continue
@@ -1167,7 +1169,7 @@ with tab_visits:
                             f"<div class='dcpct'>—</div></div>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
                 dc_label = u_all["DC User"] + u_all["DC Name"].map(
-                    lambda n: f" · {n}" if n != NA else " · naam nahi mila")
+                    lambda n: f" · {n}" if n != NA else " · name not found")
                 drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
 
 
@@ -1180,29 +1182,29 @@ LOCATION_COLS = {"Map": st.column_config.LinkColumn("Map", display_text="📍 Op
 
 with tab_locations:
     if locations.empty:
-        st.info("Abhi CSP location list nahi hai. Left side '📤 Naya data daalo' mein CSP location wali Excel / CSV daaliye "
+        st.info("No CSP location list yet. Add the CSP location Excel / CSV via '📤 Add new data' on the left "
                 "(columns: CSP Code, Latitude, Longitude).")
     else:
         st.markdown(
-            "<div class='today quiet'><div class='today-h'>📍 CSPs ne apni location (lat, long) bheji</div>"
-            "<div class='small-note'>Har CSP ek baar (latest) · complaint aur SBI app visit ke saath jodi gayi · "
-            "📍 Open se Google Maps khulega · phone numbers hidden</div></div>", unsafe_allow_html=True)
+            "<div class='today quiet'><div class='today-h'>📍 CSPs that sent their location (lat, long)</div>"
+            "<div class='small-note'>Each CSP once (latest) · matched with complaints and SBI app visits · "
+            "📍 Open opens Google Maps · phone numbers hidden</div></div>", unsafe_allow_html=True)
         check = locations[locations["Location Check"] != "OK"]
         with_complaint = locations[locations["Complaints"] > 0]
         visited = locations[locations["Last App Visit"] != ""]
         card_row([
-            (card("CSPs with location", len(locations), "lat / long mili", "", "📍"),
+            (card("CSPs with location", len(locations), "has lat / long", "", "📍"),
              "kpi_l_all", f"📍 CSP locations – {len(locations)}", location_view(locations), "locations"),
-            (card("Complaint wale", len(with_complaint), "in CSPs ki complaint hai", "orange", "📨"),
-             "kpi_l_cmp", f"📨 Complaint wale CSPs – {len(with_complaint)}", location_view(with_complaint), "locations"),
-            (card("App visit hui", len(visited), "SBI app mein visit dikhi", "green", "✅"),
-             "kpi_l_vis", f"✅ App visit hui – {len(visited)}", location_view(visited), "locations"),
-            (card("Check karo", len(check), "location India ke bahar / missing", "red", "⚠️"),
+            (card("With complaints", len(with_complaint), "these CSPs have a complaint", "orange", "📨"),
+             "kpi_l_cmp", f"📨 CSPs with complaints – {len(with_complaint)}", location_view(with_complaint), "locations"),
+            (card("App visit done", len(visited), "visit shown in SBI app", "green", "✅"),
+             "kpi_l_vis", f"✅ App visit done – {len(visited)}", location_view(visited), "locations"),
+            (card("Needs check", len(check), "location outside India / missing", "red", "⚠️"),
              "kpi_l_chk", f"⚠️ Location check – {len(check)}", location_view(check), "locations"),
         ])
         with st.container(border=True):
-            box_title("📋 Saari CSP locations", "Search: CSP code, naam ya jagah")
-            lq = st.text_input("Search locations", placeholder="🔍 CSP code, naam…", label_visibility="collapsed")
+            box_title("📋 All CSP locations", "Search: CSP code, name or place")
+            lq = st.text_input("Search locations", placeholder="🔍 CSP code, name…", label_visibility="collapsed")
             lt = locations if not lq else locations[locations.astype(str).apply(
                 lambda c: c.str.contains(lq, case=False, regex=False)).any(axis=1)]
             st.dataframe(location_view(lt), hide_index=True, width="stretch", height=min(620, 40 + 35 * len(lt)),
@@ -1215,20 +1217,21 @@ with tab_locations:
 # --- Agent ------------------------------------------------------------------------------------------------------
 with tab_agent:
     if not brief:
-        st.info("Agent brief abhi nahi bana. 'Update Report.bat' chalaiye ya 10:00 / 15:00 ke run ka intezaar kijiye.")
+        st.info("Agent brief hasn't been generated yet. Run 'Update Report.bat' or wait for the 10:00 / 15:00 run.")
     else:
         c = brief["counts"]
         st.markdown(
-            f"<div class='today quiet'><div class='today-h'>🤖 Agent ne {brief['generated_at'].replace('T', ' ')[:16]} "
-            f"pe kaam kiya</div><div class='small-note'>WhatsApp aur app visit report padhi, complaints update ki, "
-            f"jo band ho chuki thi unhe band kiya, aur kisko kya bhejna hai uske messages taiyaar kiye. "
-            f"<b>Agent khud kuch nahi bhejta</b> – messages check karke aap bhejiye.</div></div>", unsafe_allow_html=True)
+            f"<div class='today quiet'><div class='today-h'>🤖 Agent ran at "
+            f"{brief['generated_at'].replace('T', ' ')[:16]}</div><div class='small-note'>Read WhatsApp and app "
+            f"visit reports, updated complaints, closed the ones already resolved, and prepared messages for who "
+            f"to send what. <b>The agent never sends anything itself</b> – check the messages and send them "
+            f"yourself.</div></div>", unsafe_allow_html=True)
         st.markdown("<div class='cards'>" + "".join([
-            card("Auto-closed", c["auto_closed"], "app visit ho gaya, isliye band", "green", "🤖"),
-            card("Band hui", c["closed_since_last_run"], "pichhli update ke baad", "green", "✅"),
-            card("Nayi complaints", c["new"], "pichhli update ke baad", "orange", "🆕"),
-            card("Ab escalate", c["newly_escalate"], "abhi-abhi 5 din paar", "red", "🚨"),
-            card("Messages ready", c["drafts"], "copy karke bhejo", "purple", "📨"),
+            card("Auto-closed", c["auto_closed"], "app visit recorded, so closed", "green", "🤖"),
+            card("Closed", c["closed_since_last_run"], "since last update", "green", "✅"),
+            card("New complaints", c["new"], "since last update", "orange", "🆕"),
+            card("Now escalating", c["newly_escalate"], "just crossed 5 days", "red", "🚨"),
+            card("Messages ready", c["drafts"], "copy and send", "purple", "📨"),
         ]) + "</div>", unsafe_allow_html=True)
 
         def brief_table(rows: list[dict], empty: str) -> None:
@@ -1242,15 +1245,15 @@ with tab_agent:
 
         a1, a2 = st.columns(2, gap="medium")
         with a1, st.container(border=True):
-            box_title("🤖 Agent ne khud band kiya", "SBI CSP Visit App mein complaint ke baad visit dikha")
-            brief_table(brief["auto_closed"], "Abhi koi complaint auto-close nahi hui.")
+            box_title("🤖 Auto-closed by the agent", "A visit showed up in the SBI CSP Visit App after the complaint")
+            brief_table(brief["auto_closed"], "No complaint has been auto-closed yet.")
         with a2, st.container(border=True):
-            box_title("🆕 Nayi complaints", "Pichhli update ke baad judi")
-            brief_table(brief["new"], "Pichhli update ke baad koi nayi complaint nahi aayi.")
+            box_title("🆕 New complaints", "Added since the last update")
+            brief_table(brief["new"], "No new complaints since the last update.")
 
         with st.container(border=True):
-            box_title("📨 Bhejne ke liye taiyaar messages",
-                      "Har message ke kone mein copy button hai – WhatsApp mein paste karke bhejiye")
+            box_title("📨 Messages ready to send",
+                      "Each message has a copy button in the corner – paste it into WhatsApp and send")
             for d in brief["drafts"]:
                 st.markdown(f"<div style='margin-top:10px'><b>To {html.escape(d['to'])}</b> "
                             f"<span class='small-note'>· {html.escape(d['why'])}</span></div>", unsafe_allow_html=True)
@@ -1260,10 +1263,10 @@ with tab_agent:
 with tab_photos:
     with_photo = f[f["Evidence Paths"] != ""]
     if with_photo.empty:
-        st.info("In complaints ke saath photos nahi hain. WhatsApp export 'Include media' ke saath karein to yahan dikhengi.")
+        st.info("These complaints don't have photos. Export WhatsApp with 'Include media' for them to show up here.")
     else:
         options = (with_photo["Record ID"] + " · " + with_photo["CSP"] + " · " + with_photo["Problem"]).tolist()
-        rec = with_photo.iloc[options.index(st.selectbox("Complaint chuno", options))]
+        rec = with_photo.iloc[options.index(st.selectbox("Choose a complaint", options))]
         c1, c2 = st.columns([1, 1.2], gap="large")
         with c1:
             for rel in rec["Evidence Paths"].split("; "):

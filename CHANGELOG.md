@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.0 – 2026-11-27
+
+### Changed
+- Entire dashboard UI translated from Hinglish to English, and copy polished/standardized throughout (labels, tab names, captions, buttons, info/success/error messages, column headers). Also translated the Daily Update Excel sheet's labels and the upload-box messages. Outbound WhatsApp draft message bodies in the Agent tab are left as-is (sent to field staff), only their on-screen "why" captions were translated.
+
 ## 1.17.0 – 2026-11-27
 
 ### Changed
