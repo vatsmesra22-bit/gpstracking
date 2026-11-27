@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.0 – 2026-11-27
+
+### Fixed
+- "Done" in DC-wise Target vs Done was always 0%: every visit's DC name was coming from `config/dc_users.csv`, a username->name mapping file that was never set up on the server, so it always showed "name not found". Now each visit's CSP Code is matched to whichever DC it's actually assigned to right now in the DC Visit App (`/dashboard/csps`, same authoritative source as Target) — no file needed.
+
+### Changed
+- DC-wise Target vs Done is now a ranked leaderboard: numbered, with a DC initial avatar and an "On target" / "Behind" status pill, sorted by % of target completed.
+
 ## 1.18.0 – 2026-11-27
 
 ### Changed

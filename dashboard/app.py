@@ -305,18 +305,30 @@ st.markdown(f"""
   }}
 
   /* DC-wise Target vs Done */
-  .dcrow {{display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #F0ECE6;}}
-  .dcrow .dcname {{flex:0 0 190px; font-weight:700; color:{INK}; font-size:0.92rem;}}
+  .dcrow {{display:flex; align-items:center; gap:14px; padding:12px 14px; margin-bottom:8px; border-radius:14px;
+      background:#fff; border:1px solid {BORDER}; box-shadow:0 2px 8px rgba(12,18,23,0.04);
+      transition:transform .15s ease, box-shadow .15s ease;}}
+  .dcrow:hover {{transform:translateY(-2px); box-shadow:0 8px 18px rgba(12,18,23,0.08);}}
+  .dcrow .dcname {{flex:0 0 230px; display:flex; align-items:center; gap:10px; font-weight:700; color:{INK};
+      font-size:0.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}}
+  .dcrow .dcrank {{flex:0 0 auto; font-size:0.74rem; font-weight:800; color:{MUTED}; width:16px; text-align:center;}}
+  .dcrow .dcavatar {{flex:0 0 auto; width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+      justify-content:center; font-weight:800; font-size:0.82rem; color:#fff;
+      background:linear-gradient(135deg, {PRIMARY}, {HEADER_BG});}}
   .dcrow .dcbar {{flex:1 1 auto; position:relative; height:14px; background:#F0ECE6; border-radius:999px; overflow:visible;}}
   .dcrow .dcbar-fill {{position:absolute; inset:0 auto 0 0; height:100%; border-radius:999px; background:{PRIMARY};
       transition:width .4s ease;}}
   .dcrow .dcbar-fill.below {{background:{RED};}}
   .dcrow .dcbar-mark {{position:absolute; top:-3px; bottom:-3px; left:85%; width:0; border-left:2px dashed {MUTED};
       z-index:2;}}
-  .dcrow .dcnums {{flex:0 0 150px; text-align:right; font-size:0.86rem; color:{MUTED}; white-space:nowrap;}}
+  .dcrow .dcnums {{flex:0 0 130px; text-align:right; font-size:0.86rem; color:{MUTED}; white-space:nowrap;}}
   .dcrow .dcnums b {{color:{INK}; font-size:0.95rem;}}
-  .dcrow .dcpct {{flex:0 0 58px; text-align:right; font-weight:800; font-size:0.98rem;}}
+  .dcrow .dcpct {{flex:0 0 52px; text-align:right; font-weight:800; font-size:0.98rem;}}
   .dcrow .dcpct.ok {{color:{FOREST};}} .dcrow .dcpct.low {{color:{RED};}}
+  .dcrow .dcpill {{flex:0 0 auto; font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:999px;
+      white-space:nowrap;}}
+  .dcrow .dcpill.ok {{color:{FOREST}; background:color-mix(in srgb, {FOREST} 12%, white);}}
+  .dcrow .dcpill.low {{color:{RED}; background:color-mix(in srgb, {RED} 10%, white);}}
   .dc-legend {{font-size:0.78rem; color:{MUTED}; margin:2px 0 10px;}}
   .dc-legend .mk {{display:inline-block; width:10px; border-top:2px dashed {MUTED}; margin:0 4px -3px;}}
 
@@ -629,6 +641,32 @@ def dc_targets(token: str) -> dict[str, int]:
         str(dc.get("dc_name", "")).strip(): int(dc.get("csp_count", 0))
         for dc in data.get("assignments_by_dc", [])
         if dc.get("dc_name") and dc.get("csp_count")
+    }
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def csp_to_dc_name(token: str) -> dict[str, str]:
+    """CSP Code -> DC name, fetched live from the DC Visit dashboard's own /dashboard/csps API.
+
+    The SBI Visit App report only gives us each visit's raw app login ("DC User", e.g. "BC1A852773"),
+    not a real name -- config/dc_users.csv (username -> name) was meant to fill that gap but was never
+    set up on the server, so every visit shows "name not found". This sidesteps that file entirely: a
+    visit's CSP Code is matched to whichever DC it's actually assigned to in the DC Visit App right now,
+    the same authoritative source Target already comes from. No token or any request error -> {}."""
+    api = _sso_api()
+    if not api or not token:
+        return {}
+    req = urllib.request.Request(f"{api}/dashboard/csps",
+                                 headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as res:
+            data = json.loads(res.read().decode())
+    except Exception:
+        return {}
+    return {
+        str(row["code"]).strip(): str(row["dc_name"]).strip()
+        for row in data.get("items", [])
+        if row.get("code") and row.get("dc_name")
     }
 
 
@@ -1129,48 +1167,63 @@ with tab_visits:
         # --- sub-tab 3: DC-wise target vs done. "Done" is this report's real visit count; "Target" is the
         # live CSP count per DC straight from the DC Visit dashboard's own API -- never a made-up number. ------
         with va_dcwise:
-            targets = dc_targets(st.session_state.get("sso_token", ""))
+            token = st.session_state.get("sso_token", "")
+            targets = dc_targets(token)
+            csp_dc_map = csp_to_dc_name(token)
             box_title("🎯 DC-wise Target vs Done",
                       "Target = how many CSPs are assigned to that DC per the DC Visit App (live) · "
-                      "Done = how many visits were completed this month in the CSP Visit App (score ≥ counted)"
+                      "Done = how many distinct CSPs were visited this month in the CSP Visit App"
                       if targets else
                       "Target isn't available yet (not signed in via the DC Visit App) — showing 'Done' only. "
                       "This only shows up when opened from inside the DC Visit App.")
             if u_all.empty:
                 st.info("No visits this month.")
             else:
-                done_by_dc = u_all.groupby("DC Name")["CSP Code"].nunique()
-                dc_names = sorted(set(done_by_dc.index) | set(targets.keys()), key=lambda n: -done_by_dc.get(n, 0))
+                # Match each visit's CSP to the DC it's assigned to *right now* in the DC Visit App --
+                # far more reliable than the report's own "DC Name" column, which depends on a
+                # username->name mapping file that was never set up on the server.
+                real_dc = u_all["CSP Code"].map(csp_dc_map).fillna(NA) if csp_dc_map else u_all["DC Name"]
+                done_by_dc = u_all.assign(_dc=real_dc).groupby("_dc")["CSP Code"].nunique()
+                dc_names = [d for d in (set(done_by_dc.index) | set(targets.keys())) if d and d != NA]
+
+                def _rank_key(name: str) -> float:
+                    done = int(done_by_dc.get(name, 0))
+                    target = targets.get(name)
+                    return -(done / target) if target else -(done + 1000)  # unmatched DCs sort last
+
+                dc_names.sort(key=_rank_key)
+
                 if targets:
                     st.markdown(
                         f"<div class='dc-legend'>Dashed line <span class='mk'></span> = SBI guideline "
                         f"(should complete {TARGET_PCT}% or more visits)</div>", unsafe_allow_html=True)
-                for dc in dc_names:
-                    if dc == NA or not dc:
-                        continue
+
+                for rank, dc in enumerate(dc_names, start=1):
                     done = int(done_by_dc.get(dc, 0))
                     target = targets.get(dc)
+                    initial = html.escape(dc[:1].upper())
+                    name_html = f"<span class='dcrank'>{rank}</span><span class='dcavatar'>{initial}</span>{html.escape(dc)}"
                     if target:
-                        pct = min(100, round(done / target * 100))
-                        tone = "ok" if done / target * 100 >= TARGET_PCT else "low"
+                        pct_exact = done / target * 100
+                        pct = min(100, round(pct_exact))
+                        tone = "ok" if pct_exact >= TARGET_PCT else "low"
                         fill_cls = "" if tone == "ok" else "below"
+                        pill = (f"<span class='dcpill {tone}'>{'✓ On target' if tone == 'ok' else '⚠ Behind'}</span>")
                         st.markdown(
-                            f"<div class='dcrow'><div class='dcname'>{html.escape(dc)}</div>"
+                            f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
                             f"<div class='dcbar'><div class='dcbar-fill {fill_cls}' style='width:{pct}%'></div>"
                             f"<div class='dcbar-mark'></div></div>"
                             f"<div class='dcnums'><b>{done}</b> / {target} CSP</div>"
-                            f"<div class='dcpct {tone}'>{round(done / target * 100)}%</div></div>",
+                            f"<div class='dcpct {tone}'>{round(pct_exact)}%</div>{pill}</div>",
                             unsafe_allow_html=True)
                     else:
                         st.markdown(
-                            f"<div class='dcrow'><div class='dcname'>{html.escape(dc)}</div>"
+                            f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
                             f"<div class='dcbar'><div class='dcbar-fill' style='width:0%'></div></div>"
-                            f"<div class='dcnums'><b>{done}</b> visit · target N/A</div>"
+                            f"<div class='dcnums'><b>{done}</b> visits · target N/A</div>"
                             f"<div class='dcpct'>—</div></div>", unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
-                dc_label = u_all["DC User"] + u_all["DC Name"].map(
-                    lambda n: f" · {n}" if n != NA else " · name not found")
-                drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
+                drill(u_all, real_dc, "orange", view="visits", limit=20, key="vdc")
 
 
 # --- CSP Locations ----------------------------------------------------------------------------------------------
