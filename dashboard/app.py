@@ -1201,10 +1201,13 @@ with tab_visits:
             else:
                 # Match each visit's CSP to the DC it's assigned to *right now* in the DC Visit App --
                 # far more reliable than the report's own "DC Name" column, which depends on a
-                # username->name mapping file that was never set up on the server.
-                real_dc = u_all["CSP Code"].map(csp_dc_map).fillna(NA) if csp_dc_map else u_all["DC Name"]
+                # username->name mapping file that was never set up on the server. A CSP not found in
+                # the live DC Visit App list (not yet onboarded there) is labeled plainly, not NA's
+                # generic "Not Available" (used for unrelated missing-value cases elsewhere).
+                DC_UNKNOWN = "DC Unknown"
+                real_dc = u_all["CSP Code"].map(csp_dc_map).fillna(DC_UNKNOWN) if csp_dc_map else u_all["DC Name"]
                 done_by_dc = u_all.assign(_dc=real_dc).groupby("_dc")["CSP Code"].nunique()
-                dc_names = [d for d in (set(done_by_dc.index) | set(targets.keys())) if d and d != NA]
+                dc_names = [d for d in (set(done_by_dc.index) | set(targets.keys())) if d and d != DC_UNKNOWN]
 
                 # Last month's done count per DC, for the "vs last month" column -- same logic as "Done" above,
                 # just against the previous month's data instead of the one currently picked above.
@@ -1214,7 +1217,8 @@ with tab_visits:
                 if 0 <= prev_idx < len(month_list):
                     prev_once = visits[(visits["Duplicate Row"] == "No") & (visit_month(visits) == month_list[prev_idx])]
                     prev_u = prev_once[prev_once["Visit Done"] != "No"]
-                    prev_real_dc = prev_u["CSP Code"].map(csp_dc_map).fillna(NA) if csp_dc_map else prev_u["DC Name"]
+                    prev_real_dc = (prev_u["CSP Code"].map(csp_dc_map).fillna(DC_UNKNOWN)
+                                     if csp_dc_map else prev_u["DC Name"])
                     prev_done_by_dc = prev_u.assign(_dc=prev_real_dc).groupby("_dc")["CSP Code"].nunique()
 
                 def _rank_key(name: str) -> float:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.23.4 – 2026-11-27
+
+### Changed
+- In the DC-wise Target vs Done visit-detail list, a CSP whose DC couldn't be matched now shows as "DC Unknown" instead of the generic "Not Available" label — numbers unchanged.
+
 ## 1.23.3 – 2026-11-27
 
 ### Changed
