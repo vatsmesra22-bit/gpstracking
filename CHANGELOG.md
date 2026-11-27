@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.20.0 – 2026-11-27
+
+### Changed
+- Embedded slim title bar (shown inside the DC Visit dashboard) is now plain white, matching the DC Visit App's own clean look, instead of a blue gradient banner that repeated branding the outer app already shows.
+
 ## 1.19.1 – 2026-11-27
 
 ### Changed

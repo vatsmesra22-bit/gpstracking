@@ -226,15 +226,17 @@ st.markdown(f"""
   .stTabs [role="tab"][aria-selected="true"] {{background:linear-gradient(120deg, {HEADER_BG}, #0092CC) !important;
                                                color:#fff !important; box-shadow:0 6px 16px rgba(0,102,143,0.25);}}
   .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{display:none;}}
+  /* Plain/white, matching the DC Visit App's own header style (it already shows the Eko branding and
+     the DC Visit App / SBI Visit App switch, so this stays minimal rather than repeating it). */
   .embed-top {{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 18px;
-      background:linear-gradient(120deg, {HEADER_BG}, #0092CC); color:#fff; border-radius:16px; padding:14px 20px;
-      margin:0 0 16px; box-shadow:0 6px 18px rgba(0,102,143,.18);}}
-  .embed-title {{font-family:"Plus Jakarta Sans", Inter, sans-serif; font-weight:800; font-size:1.25rem; letter-spacing:-.01em;}}
-  .embed-sub {{font-weight:600; font-size:.85rem; opacity:.85; margin-left:8px;}}
-  .embed-right {{font-size:.85rem; line-height:1.8; text-align:right;}}
-  .embed-right, .embed-right .live {{color:#fff;}}
-  .embed-right .chip {{display:inline-block; color:#fff; background:rgba(255,255,255,0.14);
-      border:1px solid rgba(255,255,255,0.25); border-radius:999px; padding:2px 12px; font-weight:700;}}
+      background:#fff; color:{INK}; border:1px solid {BORDER}; border-radius:16px; padding:14px 20px;
+      margin:0 0 16px; box-shadow:0 2px 10px rgba(12,18,23,0.05);}}
+  .embed-title {{font-family:"Plus Jakarta Sans", Inter, sans-serif; font-weight:800; font-size:1.25rem;
+      letter-spacing:-.01em; color:{INK};}}
+  .embed-sub {{font-weight:600; font-size:.85rem; opacity:.7; margin-left:8px; color:{MUTED};}}
+  .embed-right {{font-size:.85rem; line-height:1.8; text-align:right; color:{MUTED};}}
+  .embed-right .chip {{display:inline-block; color:{PRIMARY}; background:color-mix(in srgb, {PRIMARY} 10%, white);
+      border:1px solid color-mix(in srgb, {PRIMARY} 25%, white); border-radius:999px; padding:2px 12px; font-weight:700;}}
   section[data-testid="stSidebar"] {{background:#fff; border-right:1px solid {BORDER};}}
   .stDownloadButton button {{background:{SAFFRON_GRADIENT}; color:#fff; border:none; border-radius:12px; font-weight:600;}}
   .stDownloadButton button:hover {{color:#fff; filter:brightness(0.97);}}
