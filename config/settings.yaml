@@ -85,9 +85,11 @@ agent_contacts:
 # An Admin / National Head logged in there opens this dashboard without the password. Empty = off.
 dc_visits_sso_api: "https://indev.eko.in/dc-visits/api/v1"
 
-# "DC-wise Target vs Done" tab: Target (CSP count per DC) comes from this hand-maintained
-# Calling Sheet (same server, shumit's sbikisok pipeline, refreshed daily ~10:15 AM). Empty = Target
-# column is hidden, only "Done" is shown. Override with CALLING_SHEET_PATH env var.
-calling_sheet_path: "/home/shumit/sbikisok/Calling Sheet.xlsx"
+# "DC-wise Target vs Done" tab: Target (CSP count per DC) comes from this small derived CSV
+# (dc_name,csp_count), written daily ~10:30 AM by a server-side job from the real Calling Sheet
+# (which lives outside this app's container, so the app can't read it directly -- this file lives
+# in the app's own `data/` volume instead). Empty = Target column hidden, only "Done" is shown.
+# Override with DC_TARGETS_PATH env var.
+dc_targets_path: "data/dc_targets.csv"
 # SBI's own guideline: a DC should complete at least this % of their assigned CSPs each month.
 visit_target_percent: 85

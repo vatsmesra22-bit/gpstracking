@@ -608,43 +608,46 @@ def _target_pct() -> int:
 TARGET_PCT = _target_pct()
 
 
-def _calling_sheet_path() -> str:
-    """Calling Sheet.xlsx path: CALLING_SHEET_PATH env, else settings.yaml `calling_sheet_path`. Empty = off."""
-    path = os.environ.get("CALLING_SHEET_PATH", "").strip()
+def _dc_targets_path() -> str:
+    """dc_targets.csv path: DC_TARGETS_PATH env, else settings.yaml `dc_targets_path`. Empty = off.
+
+    This is a small derived file (dc_name,csp_count), written by a daily server-side job that reads the
+    real Calling Sheet (which lives outside this app's container) and drops the result into this app's own
+    `data/` volume -- the one persistent folder this container can actually see.
+    """
+    path = os.environ.get("DC_TARGETS_PATH", "").strip()
     if not path:
         try:
             cfg = yaml.safe_load((PROJECT / "config" / "settings.yaml").read_text(encoding="utf-8")) or {}
-            path = str(cfg.get("calling_sheet_path") or "").strip()
+            path = str(cfg.get("dc_targets_path") or "").strip()
         except Exception:
             path = ""
     return path
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def dc_targets() -> dict[str, int]:
-    """DC name -> CSP count (Target), read fresh from the Calling Sheet each hour (the sheet itself refreshes
-    daily ~10:15 AM, so this is always same-day data). "TBA" (not yet assigned) is excluded. Missing/unreadable
-    file -> {} so the UI quietly falls back to Done-only, same as before this existed."""
-    path = _calling_sheet_path()
-    if not path or not Path(path).exists():
+    """DC name -> CSP count (Target), read fresh every 15 min from dc_targets.csv (written daily ~10:30 AM
+    by the server-side sync job). Missing/unreadable file -> {} so the UI quietly falls back to Done-only,
+    same as before this existed."""
+    path_str = _dc_targets_path()
+    if not path_str:
+        return {}
+    path = Path(path_str)
+    if not path.is_absolute():
+        path = PROJECT / path
+    if not path.exists():
         return {}
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-        ws = wb[wb.sheetnames[0]]
-        headers_row2 = [c.value for c in next(ws.iter_rows(min_row=2, max_row=2))]
-        dc_col = next((i for i, h in enumerate(headers_row2) if h and "district coordinator" in str(h).lower()), None)
-        if dc_col is None:
-            return {}
         counts: dict[str, int] = {}
-        for row in ws.iter_rows(min_row=3, values_only=True):
-            code = row[0] if row else None
-            if not code or not str(code).strip():
-                continue
-            dc = str(row[dc_col]).strip() if dc_col < len(row) and row[dc_col] else ""
-            if not dc or dc == "TBA":
-                continue
-            counts[dc] = counts.get(dc, 0) + 1
+        with open(path, newline="", encoding="utf-8") as f:
+            for row in __import__("csv").reader(f):
+                if len(row) < 2 or row[0] == "dc_name":
+                    continue
+                try:
+                    counts[row[0].strip()] = int(row[1])
+                except ValueError:
+                    continue
         return counts
     except Exception:
         return {}

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.1 – 2026-11-27
+
+### Fixed
+- Target was never showing: the app's container has no access to the real Calling Sheet's path (outside the container). Now reads a small derived `data/dc_targets.csv` (dc_name,csp_count) instead, written daily by the same server-side sync job into this app's own `data/` volume, which the container can actually see.
+
 ## 1.16.0 – 2026-11-27
 
 ### Added
