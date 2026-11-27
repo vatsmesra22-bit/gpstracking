@@ -304,6 +304,22 @@ st.markdown(f"""
         min-width:300px !important; width:300px !important; margin-left:0 !important; position:relative !important;}}
   }}
 
+  /* DC-wise Target vs Done */
+  .dcrow {{display:flex; align-items:center; gap:14px; padding:10px 0; border-bottom:1px solid #F0ECE6;}}
+  .dcrow .dcname {{flex:0 0 190px; font-weight:700; color:{INK}; font-size:0.92rem;}}
+  .dcrow .dcbar {{flex:1 1 auto; position:relative; height:14px; background:#F0ECE6; border-radius:999px; overflow:visible;}}
+  .dcrow .dcbar-fill {{position:absolute; inset:0 auto 0 0; height:100%; border-radius:999px; background:{PRIMARY};
+      transition:width .4s ease;}}
+  .dcrow .dcbar-fill.below {{background:{RED};}}
+  .dcrow .dcbar-mark {{position:absolute; top:-3px; bottom:-3px; left:85%; width:0; border-left:2px dashed {MUTED};
+      z-index:2;}}
+  .dcrow .dcnums {{flex:0 0 150px; text-align:right; font-size:0.86rem; color:{MUTED}; white-space:nowrap;}}
+  .dcrow .dcnums b {{color:{INK}; font-size:0.95rem;}}
+  .dcrow .dcpct {{flex:0 0 58px; text-align:right; font-weight:800; font-size:0.98rem;}}
+  .dcrow .dcpct.ok {{color:{FOREST};}} .dcrow .dcpct.low {{color:{RED};}}
+  .dc-legend {{font-size:0.78rem; color:{MUTED}; margin:2px 0 10px;}}
+  .dc-legend .mk {{display:inline-block; width:10px; border-top:2px dashed {MUTED}; margin:0 4px -3px;}}
+
 </style>""", unsafe_allow_html=True)
 
 
@@ -579,6 +595,59 @@ def _sso_api() -> str:
         except Exception:
             api = ""
     return api.rstrip("/")
+
+
+def _target_pct() -> int:
+    try:
+        cfg = yaml.safe_load((PROJECT / "config" / "settings.yaml").read_text(encoding="utf-8")) or {}
+        return int(cfg.get("visit_target_percent") or 85)
+    except Exception:
+        return 85
+
+
+TARGET_PCT = _target_pct()
+
+
+def _calling_sheet_path() -> str:
+    """Calling Sheet.xlsx path: CALLING_SHEET_PATH env, else settings.yaml `calling_sheet_path`. Empty = off."""
+    path = os.environ.get("CALLING_SHEET_PATH", "").strip()
+    if not path:
+        try:
+            cfg = yaml.safe_load((PROJECT / "config" / "settings.yaml").read_text(encoding="utf-8")) or {}
+            path = str(cfg.get("calling_sheet_path") or "").strip()
+        except Exception:
+            path = ""
+    return path
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def dc_targets() -> dict[str, int]:
+    """DC name -> CSP count (Target), read fresh from the Calling Sheet each hour (the sheet itself refreshes
+    daily ~10:15 AM, so this is always same-day data). "TBA" (not yet assigned) is excluded. Missing/unreadable
+    file -> {} so the UI quietly falls back to Done-only, same as before this existed."""
+    path = _calling_sheet_path()
+    if not path or not Path(path).exists():
+        return {}
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+        ws = wb[wb.sheetnames[0]]
+        headers_row2 = [c.value for c in next(ws.iter_rows(min_row=2, max_row=2))]
+        dc_col = next((i for i, h in enumerate(headers_row2) if h and "district coordinator" in str(h).lower()), None)
+        if dc_col is None:
+            return {}
+        counts: dict[str, int] = {}
+        for row in ws.iter_rows(min_row=3, values_only=True):
+            code = row[0] if row else None
+            if not code or not str(code).strip():
+                continue
+            dc = str(row[dc_col]).strip() if dc_col < len(row) and row[dc_col] else ""
+            if not dc or dc == "TBA":
+                continue
+            counts[dc] = counts.get(dc, 0) + 1
+        return counts
+    except Exception:
+        return {}
 
 
 def _dc_visits_sso_ok(token: str) -> bool:
@@ -1072,19 +1141,50 @@ with tab_visits:
                     st.download_button("⬇ Excel", to_excel(zview, "Not Done"), "csp_visits_not_done.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        # --- sub-tab 3: DC-wise target vs done. "Done" is real (this report); "Target" needs a DC
-        # phone <-> SBI username mapping that does not exist yet, so it is never shown as a made-up number. ------
+        # --- sub-tab 3: DC-wise target vs done. "Done" is this report's real visit count; "Target" is the
+        # live CSP count per DC from the Calling Sheet (dc_targets(), cached 1h) -- never a made-up number. ------
         with va_dcwise:
+            targets = dc_targets()
             box_title("🎯 DC-wise Target vs Done",
-                      "Target (CSPs assigned, humare DC Visit App se) abhi nahi joda gaya — DC ka phone number aur "
-                      "uska SBI username (jaise BC1A852773) ki ek list chahiye. Tab tak sirf 'Done' dikhaya ja raha hai.")
+                      "Target = us DC ke naam kitne CSP hain (Calling Sheet se, roz fresh) · "
+                      "Done = is mahine CSP Visit App mein kitni visit hui (score ≥ counted)"
+                      if targets else
+                      "Target abhi nahi mil paya (Calling Sheet read nahi ho payi) — sirf 'Done' dikhaya ja raha hai.")
             if u_all.empty:
                 st.info("Is mahine koi visit nahi hai.")
             else:
+                done_by_dc = u_all.groupby("DC Name")["CSP Code"].nunique()
+                dc_names = sorted(set(done_by_dc.index) | set(targets.keys()), key=lambda n: -done_by_dc.get(n, 0))
+                if targets:
+                    st.markdown(
+                        f"<div class='dc-legend'>Dashed line <span class='mk'></span> = SBI guideline "
+                        f"({TARGET_PCT}% ya zyada visit poori honi chahiye)</div>", unsafe_allow_html=True)
+                for dc in dc_names:
+                    if dc == NA or not dc:
+                        continue
+                    done = int(done_by_dc.get(dc, 0))
+                    target = targets.get(dc)
+                    if target:
+                        pct = min(100, round(done / target * 100))
+                        tone = "ok" if done / target * 100 >= TARGET_PCT else "low"
+                        fill_cls = "" if tone == "ok" else "below"
+                        st.markdown(
+                            f"<div class='dcrow'><div class='dcname'>{html.escape(dc)}</div>"
+                            f"<div class='dcbar'><div class='dcbar-fill {fill_cls}' style='width:{pct}%'></div>"
+                            f"<div class='dcbar-mark'></div></div>"
+                            f"<div class='dcnums'><b>{done}</b> / {target} CSP</div>"
+                            f"<div class='dcpct {tone}'>{round(done / target * 100)}%</div></div>",
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown(
+                            f"<div class='dcrow'><div class='dcname'>{html.escape(dc)}</div>"
+                            f"<div class='dcbar'><div class='dcbar-fill' style='width:0%'></div></div>"
+                            f"<div class='dcnums'><b>{done}</b> visit · target N/A</div>"
+                            f"<div class='dcpct'>—</div></div>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
                 dc_label = u_all["DC User"] + u_all["DC Name"].map(
                     lambda n: f" · {n}" if n != NA else " · naam nahi mila")
                 drill(u_all, dc_label, "orange", view="visits", limit=20, key="vdc")
-                st.caption("Target column add hone ke baad yahan 'kitna karna tha vs kitna kiya' (%) bhi dikhega.")
 
 
 # --- CSP Locations ----------------------------------------------------------------------------------------------

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.0 – 2026-11-27
+
+### Added
+- **DC-wise Target vs Done** now shows a real Target: CSP count per DC, read fresh (cached 1h) from the shared Calling Sheet (`calling_sheet_path` in settings.yaml / `CALLING_SHEET_PATH` env, same server). Shows a done/target bar with the SBI 85% guideline marker and a status %. Falls back to Done-only if the sheet isn't reachable — never shows a made-up Target.
+
 ## 1.15.0 – 2026-11-25
 
 ### Added
