@@ -1006,6 +1006,8 @@ with tab_visits:
             st.stop()
         period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}" if len(u) else "—"
         low = u[u["Visit Score"] < LOW_SCORE]
+        sso_token = st.session_state.get("sso_token", "")
+        active_csps = sum(dc_targets(sso_token).values())  # total CSPs currently assigned, live from the DC Visit App
 
         va_done, va_notdone, va_dcwise = st.tabs([
             f"✅ Visit Done ({len(u_all)})", f"📍 Not Done (Lat/Long) ({len(zero)})", "🎯 DC-wise Target vs Done",
@@ -1013,7 +1015,13 @@ with tab_visits:
 
         # --- sub-tab 1: Visit Done (everything that was here before, unchanged) -----------------------------
         with va_done:
-            card_row([
+            top_cards = []
+            if active_csps:
+                top_cards.append(
+                    (card("Active CSPs", active_csps, "assigned across all DCs (live)", "purple", "🏪"),
+                     "kpi_v_active", "🏪 Active CSPs — see the DC-wise Target vs Done tab for the breakdown",
+                     pd.DataFrame(), "visits"))
+            card_row(top_cards + [
                 (card("Visits done", len(u_all), f"{len(u)} distinct CSPs · {period}", "", "📲"), "kpi_v_all",
                  f"📲 Visits done – {len(u_all)} visits · {len(u)} distinct CSPs", u_all, "visits"),
                 (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
@@ -1167,9 +1175,8 @@ with tab_visits:
         # --- sub-tab 3: DC-wise target vs done. "Done" is this report's real visit count; "Target" is the
         # live CSP count per DC straight from the DC Visit dashboard's own API -- never a made-up number. ------
         with va_dcwise:
-            token = st.session_state.get("sso_token", "")
-            targets = dc_targets(token)
-            csp_dc_map = csp_to_dc_name(token)
+            targets = dc_targets(sso_token)
+            csp_dc_map = csp_to_dc_name(sso_token)
             box_title("🎯 DC-wise Target vs Done",
                       "Target = how many CSPs are assigned to that DC per the DC Visit App (live) · "
                       "Done = how many distinct CSPs were visited this month in the CSP Visit App"

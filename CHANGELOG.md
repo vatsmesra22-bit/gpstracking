@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.1 – 2026-11-27
+
+### Added
+- "Active CSPs" (live total across all DCs) now also shows as its own card on the Visit Done stat row, not only inside the DC-wise Target vs Done tab.
+
 ## 1.21.0 – 2026-11-27
 
 ### Added
