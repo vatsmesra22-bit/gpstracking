@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.22.0 – 2026-11-27
+
+### Added
+- DC-wise Target vs Done leaderboard now shows each DC's change vs last month (▲/▼ visits done), next to this month's Done/Target.
+
 ## 1.21.1 – 2026-11-27
 
 ### Added

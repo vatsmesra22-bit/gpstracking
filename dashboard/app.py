@@ -323,8 +323,10 @@ st.markdown(f"""
   .dcrow .dcbar-fill.below {{background:{RED};}}
   .dcrow .dcbar-mark {{position:absolute; top:-3px; bottom:-3px; left:85%; width:0; border-left:2px dashed {MUTED};
       z-index:2;}}
-  .dcrow .dcnums {{flex:0 0 130px; text-align:right; font-size:0.86rem; color:{MUTED}; white-space:nowrap;}}
+  .dcrow .dcnums {{flex:0 0 230px; text-align:right; font-size:0.86rem; color:{MUTED}; white-space:nowrap;}}
   .dcrow .dcnums b {{color:{INK}; font-size:0.95rem;}}
+  .dcrow .dctrend {{display:inline-block; margin-left:6px; font-size:0.74rem; font-weight:700;}}
+  .dcrow .dctrend.up {{color:{FOREST};}} .dcrow .dctrend.down {{color:{RED};}}
   .dcrow .dcpct {{flex:0 0 52px; text-align:right; font-weight:800; font-size:0.98rem;}}
   .dcrow .dcpct.ok {{color:{FOREST};}} .dcrow .dcpct.low {{color:{RED};}}
   .dcrow .dcpill {{flex:0 0 auto; font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:999px;
@@ -1193,6 +1195,17 @@ with tab_visits:
                 done_by_dc = u_all.assign(_dc=real_dc).groupby("_dc")["CSP Code"].nunique()
                 dc_names = [d for d in (set(done_by_dc.index) | set(targets.keys())) if d and d != NA]
 
+                # Last month's done count per DC, for the "vs last month" column -- same logic as "Done" above,
+                # just against the previous month's data instead of the one currently picked above.
+                month_list = list(months["Month"])
+                prev_idx = month_list.index(month) + 1 if month in month_list else -1
+                prev_done_by_dc: pd.Series = pd.Series(dtype=int)
+                if 0 <= prev_idx < len(month_list):
+                    prev_once = visits[(visits["Duplicate Row"] == "No") & (visit_month(visits) == month_list[prev_idx])]
+                    prev_u = prev_once[prev_once["Visit Done"] != "No"]
+                    prev_real_dc = prev_u["CSP Code"].map(csp_dc_map).fillna(NA) if csp_dc_map else prev_u["DC Name"]
+                    prev_done_by_dc = prev_u.assign(_dc=prev_real_dc).groupby("_dc")["CSP Code"].nunique()
+
                 def _rank_key(name: str) -> float:
                     done = int(done_by_dc.get(name, 0))
                     target = targets.get(name)
@@ -1224,6 +1237,10 @@ with tab_visits:
                         initial = html.escape(dc[:1].upper())
                         name_html = (f"<span class='dcrank'>{rank}</span><span class='dcavatar'>{initial}</span>"
                                      f"{html.escape(dc)}")
+                        prev_done = int(prev_done_by_dc.get(dc, 0))
+                        trend = (f" <span class='dctrend {'up' if done >= prev_done else 'down'}'>"
+                                 f"{'▲' if done >= prev_done else '▼'} {abs(done - prev_done)} vs last month</span>"
+                                 if not prev_done_by_dc.empty else "")
                         if target:
                             pct_exact = done / target * 100
                             pct = min(100, round(pct_exact))
@@ -1234,13 +1251,13 @@ with tab_visits:
                                 f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
                                 f"<div class='dcbar'><div class='dcbar-fill {fill_cls}' style='width:{pct}%'></div>"
                                 f"<div class='dcbar-mark'></div></div>"
-                                f"<div class='dcnums'><b>{done}</b> / {target} CSP</div>"
+                                f"<div class='dcnums'><b>{done}</b> / {target} CSP{trend}</div>"
                                 f"<div class='dcpct {tone}'>{round(pct_exact)}%</div>{pill}</div>")
                         else:
                             rows_html.append(
                                 f"<div class='dcrow'><div class='dcname'>{name_html}</div>"
                                 f"<div class='dcbar'><div class='dcbar-fill' style='width:0%'></div></div>"
-                                f"<div class='dcnums'><b>{done}</b> visits · target N/A</div>"
+                                f"<div class='dcnums'><b>{done}</b> visits · target N/A{trend}</div>"
                                 f"<div class='dcpct'>—</div></div>")
                     st.markdown("".join(rows_html), unsafe_allow_html=True)
 
