@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.17.0 – 2026-11-27
+
+### Changed
+- "DC-wise Target vs Done" Target now comes live from the DC Visit dashboard's own `/dashboard/overview` API (assignments_by_dc), using the same admin token embedded mode already gets -- no file, no volume, no separate sync job to keep in sync. 1.16.1's `data/dc_targets.csv` approach never worked in production: eko-deploy's own managed volume for `data/` is not the docker-compose.yml bind mount, so the file the sync job wrote was invisible to the running container.
+
 ## 1.16.1 – 2026-11-27
 
 ### Fixed

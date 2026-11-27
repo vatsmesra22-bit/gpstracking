@@ -608,49 +608,28 @@ def _target_pct() -> int:
 TARGET_PCT = _target_pct()
 
 
-def _dc_targets_path() -> str:
-    """dc_targets.csv path: DC_TARGETS_PATH env, else settings.yaml `dc_targets_path`. Empty = off.
-
-    This is a small derived file (dc_name,csp_count), written by a daily server-side job that reads the
-    real Calling Sheet (which lives outside this app's container) and drops the result into this app's own
-    `data/` volume -- the one persistent folder this container can actually see.
-    """
-    path = os.environ.get("DC_TARGETS_PATH", "").strip()
-    if not path:
-        try:
-            cfg = yaml.safe_load((PROJECT / "config" / "settings.yaml").read_text(encoding="utf-8")) or {}
-            path = str(cfg.get("dc_targets_path") or "").strip()
-        except Exception:
-            path = ""
-    return path
-
-
-@st.cache_data(ttl=900, show_spinner=False)
-def dc_targets() -> dict[str, int]:
-    """DC name -> CSP count (Target), read fresh every 15 min from dc_targets.csv (written daily ~10:30 AM
-    by the server-side sync job). Missing/unreadable file -> {} so the UI quietly falls back to Done-only,
-    same as before this existed."""
-    path_str = _dc_targets_path()
-    if not path_str:
+@st.cache_data(ttl=300, show_spinner=False)
+def dc_targets(token: str) -> dict[str, int]:
+    """DC name -> CSP count (Target), fetched live from the DC Visit dashboard's own
+    /dashboard/overview API (assignments_by_dc) using the same admin token that got us into embedded
+    mode -- no separate auth, no file to keep in sync. No token (opened outside the DC Visit dashboard)
+    or any request error -> {} so the UI quietly falls back to Done-only."""
+    api = _sso_api()
+    if not api or not token:
         return {}
-    path = Path(path_str)
-    if not path.is_absolute():
-        path = PROJECT / path
-    if not path.exists():
-        return {}
+    today = pd.Timestamp.now(tz="Asia/Kolkata").strftime("%Y-%m-%d")
+    req = urllib.request.Request(f"{api}/dashboard/overview?date={today}",
+                                 headers={"Authorization": f"Bearer {token}"})
     try:
-        counts: dict[str, int] = {}
-        with open(path, newline="", encoding="utf-8") as f:
-            for row in __import__("csv").reader(f):
-                if len(row) < 2 or row[0] == "dc_name":
-                    continue
-                try:
-                    counts[row[0].strip()] = int(row[1])
-                except ValueError:
-                    continue
-        return counts
+        with urllib.request.urlopen(req, timeout=8) as res:
+            data = json.loads(res.read().decode())
     except Exception:
         return {}
+    return {
+        str(dc.get("dc_name", "")).strip(): int(dc.get("csp_count", 0))
+        for dc in data.get("assignments_by_dc", [])
+        if dc.get("dc_name") and dc.get("csp_count")
+    }
 
 
 def _dc_visits_sso_ok(token: str) -> bool:
@@ -682,6 +661,7 @@ def require_login() -> None:
         if _dc_visits_sso_ok(sso):
             st.session_state["auth_ok"] = True
             st.session_state["embedded"] = True
+            st.session_state["sso_token"] = sso  # reused later to fetch DC-wise Target, no separate auth needed
             st.rerun()
     st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
     _, mid, _ = st.columns([1, 1.25, 1])
@@ -1145,14 +1125,15 @@ with tab_visits:
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         # --- sub-tab 3: DC-wise target vs done. "Done" is this report's real visit count; "Target" is the
-        # live CSP count per DC from the Calling Sheet (dc_targets(), cached 1h) -- never a made-up number. ------
+        # live CSP count per DC straight from the DC Visit dashboard's own API -- never a made-up number. ------
         with va_dcwise:
-            targets = dc_targets()
+            targets = dc_targets(st.session_state.get("sso_token", ""))
             box_title("🎯 DC-wise Target vs Done",
-                      "Target = us DC ke naam kitne CSP hain (Calling Sheet se, roz fresh) · "
+                      "Target = DC Visit App ke hisab se us DC ko kitne CSP assign hain (live) · "
                       "Done = is mahine CSP Visit App mein kitni visit hui (score ≥ counted)"
                       if targets else
-                      "Target abhi nahi mil paya (Calling Sheet read nahi ho payi) — sirf 'Done' dikhaya ja raha hai.")
+                      "Target abhi nahi mil paya (DC Visit App se login nahi mila) — sirf 'Done' dikhaya ja raha hai. "
+                      "Ye sirf DC Visit App ke andar se khulne par dikhta hai.")
             if u_all.empty:
                 st.info("Is mahine koi visit nahi hai.")
             else:
