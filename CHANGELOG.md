@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.22.1 – 2026-11-27
+
+### Changed
+- Removed the "Active CSPs" card from the Visit Done row — it had no breakdown right next to it there, which looked out of place. Total CSPs + its per-DC breakdown now live only in DC-wise Target vs Done, where the total sits directly above the leaderboard.
+
 ## 1.22.0 – 2026-11-27
 
 ### Added

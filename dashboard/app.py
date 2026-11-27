@@ -1009,7 +1009,6 @@ with tab_visits:
         period = f"{min(u['Visit Date']):%d %b} – {max(u['Visit Date']):%d %b %Y}" if len(u) else "—"
         low = u[u["Visit Score"] < LOW_SCORE]
         sso_token = st.session_state.get("sso_token", "")
-        active_csps = sum(dc_targets(sso_token).values())  # total CSPs currently assigned, live from the DC Visit App
 
         va_done, va_notdone, va_dcwise = st.tabs([
             f"✅ Visit Done ({len(u_all)})", f"📍 Not Done (Lat/Long) ({len(zero)})", "🎯 DC-wise Target vs Done",
@@ -1017,13 +1016,7 @@ with tab_visits:
 
         # --- sub-tab 1: Visit Done (everything that was here before, unchanged) -----------------------------
         with va_done:
-            top_cards = []
-            if active_csps:
-                top_cards.append(
-                    (card("Active CSPs", active_csps, "assigned across all DCs (live)", "purple", "🏪"),
-                     "kpi_v_active", "🏪 Active CSPs — see the DC-wise Target vs Done tab for the breakdown",
-                     pd.DataFrame(), "visits"))
-            card_row(top_cards + [
+            card_row([
                 (card("Visits done", len(u_all), f"{len(u)} distinct CSPs · {period}", "", "📲"), "kpi_v_all",
                  f"📲 Visits done – {len(u_all)} visits · {len(u)} distinct CSPs", u_all, "visits"),
                 (card("DCs (app users)", u["DC User"].nunique(), "made these visits", "", "👥"),
